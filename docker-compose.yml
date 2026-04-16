@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: placement-db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - placement-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: placement-api
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/placement-db?authSource=admin
+      CONFLUX_RPC_URL: https://evm.confluxrpc.com
+      CONFLUX_CHAIN_ID: 71
+      PLACEMENT_CONTRACT_ADDRESS: ${PLACEMENT_CONTRACT_ADDRESS:-0x0}
+      PRIVATE_KEY: ${PRIVATE_KEY:-0x0}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-32-chars-long!!!}
+      CORS_ORIGIN: http://localhost:5173,http://localhost:3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - placement-network
+    healthcheck:
+      test: curl -f http://localhost:3000/api/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: placement-web
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - placement-network
+    command: npm run dev
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  placement-network:
+    driver: bridge

@@ -1,0 +1,10 @@
+#pragma version 11
+#pragma typetrack false
+
+// PlacementCollege.PlacementCollege.approval_program() -> uint64:
+main:
+    // PlacementCollege.py:6-7
+    // # Logic for college registration, status (private/autonomous), and verification
+    // return True  # Approve
+    pushint 1
+    return

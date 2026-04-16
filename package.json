@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "solc": "^0.8.34"
+  },
+  "scripts": {
+    "sync:env": "node sync-contract-address.js",
+    "dev": "npm run sync:env && concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\""
+  },
+  "dependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "buffer": "^6.0.3"
+  }
+}

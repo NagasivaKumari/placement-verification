@@ -1,0 +1,10 @@
+#pragma version 11
+#pragma typetrack false
+
+// PlacementProcess.PlacementProcess.approval_program() -> uint64:
+main:
+    // PlacementProcess.py:6-7
+    // # Logic for placement offer, joining, salary, and verification
+    // return True  # Approve
+    pushint 1
+    return

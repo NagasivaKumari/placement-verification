@@ -1,0 +1,10 @@
+#pragma version 11
+#pragma typetrack false
+
+// PlacementCompany.PlacementCompany.approval_program() -> uint64:
+main:
+    // PlacementCompany.py:6-7
+    // # Logic for company registration, document upload, and verification
+    // return True  # Approve
+    pushint 1
+    return
