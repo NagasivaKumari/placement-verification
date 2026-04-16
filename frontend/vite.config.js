@@ -6,8 +6,8 @@ import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfil
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
-    strictPort: false,
+    port: 5175,
+    strictPort: true,
     host: '0.0.0.0'
   },
   build: {
