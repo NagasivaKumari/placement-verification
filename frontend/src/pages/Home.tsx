@@ -14,12 +14,23 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
   const [studentId, setStudentId] = useState("");
   const [studentCourse, setStudentCourse] = useState("");
   const [studentYear, setStudentYear] = useState("");
+  const [studentBranch, setStudentBranch] = useState("");
+  const [studentCgpa, setStudentCgpa] = useState("");
+  const [studentPhone, setStudentPhone] = useState("");
   // College Specific
   const [collegeId, setCollegeId] = useState("");
   const [collegeCity, setCollegeCity] = useState("");
+  const [collegeNaac, setCollegeNaac] = useState("");
+  const [collegeAffiliation, setCollegeAffiliation] = useState("");
+  const [collegePlacementOfficer, setCollegePlacementOfficer] = useState("");
+  const [collegeWebsite, setCollegeWebsite] = useState("");
   // Company Specific
   const [companyId, setCompanyId] = useState("");
   const [companyIndustry, setCompanyIndustry] = useState("");
+  const [companyDomain, setCompanyDomain] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
+  const [companySize, setCompanySize] = useState("");
+  const [companyCin, setCompanyCin] = useState("");
   
   const [regPhase, setRegPhase] = useState(0); // 0: Form, 1: OTP
   const [userOtp, setUserOtp] = useState("");
@@ -66,17 +77,29 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
           college: studentCollege,
           enrollmentId: studentId,
           course: studentCourse,
-          year: studentYear
+          branch: studentBranch,
+          year: studentYear,
+          cgpa: studentCgpa,
+          phone: studentPhone,
+          collegeVerified: false  // Must be verified by college before applying
         };
       } else if (selectedRole === "college") {
         payload.details = {
           collegeId: collegeId,
-          cityState: collegeCity
+          cityState: collegeCity,
+          naacGrade: collegeNaac,
+          affiliation: collegeAffiliation,
+          placementOfficer: collegePlacementOfficer,
+          website: collegeWebsite
         };
       } else if (selectedRole === "company") {
         payload.details = {
           companyId: companyId,
-          industry: companyIndustry
+          industry: companyIndustry,
+          officialDomain: companyDomain.toLowerCase().replace('@','').trim(),
+          website: companyWebsite,
+          size: companySize,
+          cin: companyCin
         };
       }
       const response = await fetch('http://localhost:8000/api/auth/register-role', {
@@ -136,24 +159,69 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
                   />
 
-                  {/* Role Specific Details (Simplified for brevity in Phase 0) */}
+                  {/* Student Fields */}
                   {selectedRole === "student" && (
-                    <div className="grid grid-cols-2 gap-2">
-                       <input type="text" placeholder="College" value={studentCollege || ""} onChange={e => setStudentCollege(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
-                       <input type="text" placeholder="ID No" value={studentId || ""} onChange={e => setStudentId(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
-                       <input type="text" placeholder="Course" value={studentCourse || ""} onChange={e => setStudentCourse(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
-                       <input type="text" placeholder="Grad Year" value={studentYear || ""} onChange={e => setStudentYear(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-l-2 border-indigo-500 pl-2">Academic Identity</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="College Name *" value={studentCollege} onChange={e => setStudentCollege(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" required />
+                        <input type="text" placeholder="Enrollment / Roll No *" value={studentId} onChange={e => setStudentId(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" required />
+                        <input type="text" placeholder="Course (e.g. B.Tech) *" value={studentCourse} onChange={e => setStudentCourse(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" required />
+                        <input type="text" placeholder="Branch (e.g. CSE, ECE)" value={studentBranch} onChange={e => setStudentBranch(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                        <input type="text" placeholder="Graduation Year (e.g. 2025)" value={studentYear} onChange={e => setStudentYear(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                        <input type="text" placeholder="CGPA / % (e.g. 8.5)" value={studentCgpa} onChange={e => setStudentCgpa(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                      </div>
+                      <input type="tel" placeholder="Phone Number *" value={studentPhone} onChange={e => setStudentPhone(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" required />
+                      <p className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
+                        ⚠️ Your college must verify your enrollment before you can submit placement claims.
+                      </p>
                     </div>
                   )}
-                  {selectedRole === "company" && (
-                     <div className="grid grid-cols-1 gap-2">
-                        <input type="text" placeholder="Industry" value={companyIndustry || ""} onChange={e => setCompanyIndustry(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
-                     </div>
-                  )}
+
+                  {/* College Fields */}
                   {selectedRole === "college" && (
-                     <div className="grid grid-cols-1 gap-2">
-                        <input type="text" placeholder="City/State" value={collegeCity || ""} onChange={e => setCollegeCity(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
-                     </div>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-l-2 border-indigo-500 pl-2">Institutional Details</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="City / State *" value={collegeCity} onChange={e => setCollegeCity(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" required />
+                        <select value={collegeNaac} onChange={e => setCollegeNaac(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white">
+                          <option value="">NAAC Grade</option>
+                          <option value="A++">A++</option>
+                          <option value="A+">A+</option>
+                          <option value="A">A</option>
+                          <option value="B++">B++</option>
+                          <option value="B+">B+</option>
+                          <option value="B">B</option>
+                          <option value="Not Accredited">Not Accredited</option>
+                        </select>
+                        <input type="text" placeholder="Affiliated University" value={collegeAffiliation} onChange={e => setCollegeAffiliation(e.target.value)} className="col-span-2 bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                        <input type="text" placeholder="Placement Officer Name" value={collegePlacementOfficer} onChange={e => setCollegePlacementOfficer(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                        <input type="text" placeholder="College Website" value={collegeWebsite} onChange={e => setCollegeWebsite(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Company Fields */}
+                  {selectedRole === "company" && (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-l-2 border-indigo-500 pl-2">Company Identity</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="Industry (e.g. IT, Finance) *" value={companyIndustry} onChange={e => setCompanyIndustry(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" required />
+                        <input type="text" placeholder="Official Email Domain * (e.g. tcs.com)" value={companyDomain} onChange={e => setCompanyDomain(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" required />
+                        <input type="text" placeholder="Company Website" value={companyWebsite} onChange={e => setCompanyWebsite(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                        <select value={companySize} onChange={e => setCompanySize(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white">
+                          <option value="">Company Size</option>
+                          <option value="startup">Startup (1-50)</option>
+                          <option value="sme">SME (51-500)</option>
+                          <option value="enterprise">Enterprise (500+)</option>
+                          <option value="mnc">MNC / Global</option>
+                        </select>
+                        <input type="text" placeholder="CIN / GST Number" value={companyCin} onChange={e => setCompanyCin(e.target.value)} className="col-span-2 bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                      </div>
+                      <p className="text-[10px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-2">
+                        📧 Your official email domain is used to validate offer letters sent to students.
+                      </p>
+                    </div>
                   )}
 
                   <button 
@@ -192,9 +260,6 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
                 </p>
               )}
             </div>
-          </div>
-        </div>
-      )}
           </div>
         </div>
       )}

@@ -29,6 +29,34 @@ const CompanyDashboard = ({ token, account }) => {
   const [verifying, setVerifying] = useState(null);
   const [verifyMsg, setVerifyMsg] = useState({});
 
+  const handleConfirmStep = async (verificationCode, step, extraData = {}) => {
+    setVerifying(verificationCode);
+    try {
+      let endpoint = '';
+      let body = { verificationCode, ...extraData };
+      
+      if (step === 'joining') endpoint = '/api/placements/company-verify-joining';
+      if (step === 'payroll') endpoint = '/api/placements/verify-salary';
+
+      const res = await fetch(`http://localhost:8000${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVerifyMsg(prev => ({ ...prev, [verificationCode]: '✅ Step verified!' }));
+      } else {
+        setVerifyMsg(prev => ({ ...prev, [verificationCode]: `❌ ${data.detail || 'Failed'}` }));
+      }
+      fetchPlacements();
+    } catch (err) {
+       console.error(err);
+    } finally {
+       setVerifying(null);
+    }
+  };
+
   const handleVerify = async (verificationCode) => {
     setVerifying(verificationCode);
     setVerifyMsg(prev => ({ ...prev, [verificationCode]: '' }));
@@ -153,20 +181,43 @@ const CompanyDashboard = ({ token, account }) => {
                        <span className="text-xs font-bold text-white bg-slate-800 px-3 py-1 rounded-lg border border-slate-700">{p.role}</span>
                     </td>
                     <td className="px-8 py-6">
-                       <span className="font-mono text-emerald-400 font-bold text-sm tracking-tighter">₹{p.salary.toLocaleString()}</span>
+                        {p.placementType === 'internship' && p.salary === 0 ? (
+                          <span className="text-purple-400 font-bold text-sm">🎓 Unpaid Intern</span>
+                        ) : p.placementType === 'internship' ? (
+                          <span className="font-mono text-purple-400 font-bold text-sm tracking-tighter">₹{p.salary.toLocaleString()} Stipend</span>
+                        ) : (
+                          <span className="font-mono text-emerald-400 font-bold text-sm tracking-tighter">₹{p.salary.toLocaleString()}</span>
+                        )}
                     </td>
                     <td className="px-8 py-6 whitespace-nowrap">
                       {p.status === 'pending_company_approval' ? (
                         <div className="flex items-center gap-2">
                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                           <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Pending Review</span>
+                           <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Awaiting Initial Review</span>
                         </div>
                       ) : p.status === 'offer_verified' ? (
-                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10">Offer Sealed</span>
+                        <div className="flex items-center gap-2">
+                           <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                           <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Offer Sealed</span>
+                        </div>
+                      ) : p.status === 'joining_pending' ? (
+                        <div className="flex items-center gap-2">
+                           <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                           <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Joining Proof Uploaded</span>
+                        </div>
                       ) : p.status === 'joining_verified' ? (
-                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest bg-blue-500/5 px-2 py-1 rounded border border-blue-500/10">Joined Work</span>
+                        <div className="flex items-center gap-2 text-blue-500">
+                           <span className="text-[10px] font-black uppercase tracking-widest">Onboarded</span>
+                        </div>
+                      ) : p.status === 'salary_pending' ? (
+                        <div className="flex items-center gap-2">
+                           <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+                           <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Payroll Proof Uploaded</span>
+                        </div>
                       ) : (
-                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10">Fully Certified</span>
+                        <div className="flex items-center gap-2 text-emerald-500">
+                           <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10">Fully Certified</span>
+                        </div>
                       )}
                     </td>
                     <td className="px-8 py-6 text-right">
@@ -174,14 +225,37 @@ const CompanyDashboard = ({ token, account }) => {
                         <button 
                           onClick={() => handleVerify(p.verificationCode)}
                           disabled={verifying === p.verificationCode}
-                          className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-wait"
+                          className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95 disabled:opacity-50"
                         >
-                          {verifying === p.verificationCode ? 'Signing...' : 'Approve Claim'}
+                          {verifying === p.verificationCode ? 'Signing...' : 'Approve Offer'}
                         </button>
+                      ) : p.status === 'joining_pending' ? (
+                         <button 
+                           onClick={() => handleConfirmStep(p.verificationCode, 'joining')}
+                           disabled={verifying === p.verificationCode}
+                           className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-500 transition-all"
+                         >
+                           Verify Onboarding
+                         </button>
+                      ) : p.status === 'salary_pending' ? (
+                        <button 
+                          onClick={() => {
+                            const amt = prompt(`Confirm Salary amount for ${p.studentName}\nStudent reported: ₹${p.salary}`, p.salary);
+                            if (amt) handleConfirmStep(p.verificationCode, 'payroll', { amount: parseFloat(amt), salaryTxHash: 'PAYROLL_SYSTEM_MATCH' });
+                          }}
+                          disabled={verifying === p.verificationCode}
+                          className="bg-purple-600 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition-all"
+                        >
+                          Verify Payroll
+                        </button>
+                      ) : p.status === 'salary_verified' ? (
+                         <div className="text-emerald-500 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                            On-Chain Certified
+                         </div>
                       ) : (
                          <div className="text-slate-600 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                            Signed
+                            {p.status.split('_').join(' ')}
                          </div>
                       )}
                       {verifyMsg[p.verificationCode] && (

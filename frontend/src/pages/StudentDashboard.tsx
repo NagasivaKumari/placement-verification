@@ -9,6 +9,8 @@ const StudentDashboard = ({ token, account }) => {
   const [offerCompany, setOfferCompany] = useState("");
   const [offerRole, setOfferRole] = useState("");
   const [offerSalary, setOfferSalary] = useState("");
+  const [offerSenderEmail, setOfferSenderEmail] = useState("");
+  const [placementType, setPlacementType] = useState("full-time");
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -18,10 +20,25 @@ const StudentDashboard = ({ token, account }) => {
   const [salaryAmount, setSalaryAmount] = useState("");
   const [salaryHash, setSalaryHash] = useState("");
 
+  const [profile, setProfile] = useState(null);
+
   useEffect(() => {
     fetchPlacements();
     fetchCompanies();
-  }, []);
+    fetchProfile();
+  }, [token]);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/user/profile', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.role) setProfile(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchPlacements = async () => {
     try {
@@ -65,7 +82,9 @@ const StudentDashboard = ({ token, account }) => {
         body: JSON.stringify({
           companyWallet: offerCompany,
           role: offerRole,
-          salary: parseFloat(offerSalary) || 0,
+          salary: placementType === 'internship' ? 0 : (parseFloat(offerSalary) || 0),
+          placementType: placementType,
+          senderEmail: offerSenderEmail,
           documentHash: "ipfs_offchain_mock_" + Math.random().toString(16).slice(2)
         })
       });
@@ -91,13 +110,15 @@ const StudentDashboard = ({ token, account }) => {
       let endpoint = '';
       let body: any = { verificationCode: code };
       
-      if (phase === 'join') {
-        endpoint = '/api/placements/student-join';
-        body.location = 'Office - HQ'; 
-      } else if (phase === 'salary') {
+      if (phase === 'join-upload') {
+        endpoint = '/api/placements/upload-joining';
+        body.documentHash = "ipfs_joining_" + Math.random().toString(36).substring(7);
+      } else if (phase === 'salary-upload') {
+        endpoint = '/api/placements/upload-salary-slip';
+        body.documentHash = "ipfs_salary_" + Math.random().toString(36).substring(7);
+      } else if (phase === 'salary-match') {
         endpoint = '/api/placements/verify-salary';
         body.amount = parseFloat(salaryAmount) || 0;
-        // Use auto-filled txHash from placement record, fallback to manual entry
         body.salaryTxHash = placementTxHash || salaryHash || 'pending';
       }
 
@@ -112,6 +133,8 @@ const StudentDashboard = ({ token, account }) => {
         setSalaryAmount('');
         setSalaryHash('');
         fetchPlacements();
+      } else {
+        alert(data.detail || "Operation failed.");
       }
     } catch (err) {
       console.error(err);
@@ -120,9 +143,40 @@ const StudentDashboard = ({ token, account }) => {
 
   return (
     <div className="container-custom py-12">
-      <div className="mb-12">
-        <h1 className="text-4xl font-black mb-2 text-white">Student Hub</h1>
-        <p className="text-slate-400">Manage your employment lifecycle and anchor the truth on-chain.</p>
+      {/* Identity Passport Banner */}
+      <div className="premium-card mb-12 bg-gradient-to-br from-indigo-600/10 to-transparent border-indigo-500/20 overflow-hidden relative">
+         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-indigo-500/5 -skew-x-12 translate-x-1/2"></div>
+         <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+            <div className="w-24 h-24 rounded-[2rem] bg-indigo-600 flex items-center justify-center text-3xl font-black text-white shadow-2xl shadow-indigo-600/40 border-4 border-white/10 italic">
+               {profile?.name ? profile.name.charAt(0) : "S"}
+            </div>
+            <div className="flex-1 text-center md:text-left">
+               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
+                  <h1 className="text-4xl font-black text-white italic">{profile?.name || "Verified Student"}</h1>
+                  <span className="badge-verified bg-emerald-500 text-white border-none py-1">Identity Anchored</span>
+               </div>
+               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4">
+                  <p className="text-slate-400 font-bold">{profile?.details?.college || "Global User"} <span className="text-slate-600 mx-2">|</span> {profile?.details?.course || "Not Programmed"}</p>
+                  {profile?.details?.collegeVerified ? (
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[10px] font-black text-emerald-400 uppercase tracking-widest">🛡️ Institution Verified</span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[10px] font-black text-amber-500 uppercase tracking-widest">⏳ Institutional Review Pending</span>
+                  )}
+               </div>
+               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
+                  <div className="bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5">
+                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Identity Tx</p>
+                     <p className="text-xs font-mono text-indigo-400">{profile?.identityTx ? profile.identityTx.slice(0, 15) + "..." : "Genesis Node"}</p>
+                  </div>
+                  {profile?.details?.degreeVerified && (
+                    <div className="bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20">
+                       <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mb-1">Official Degree</p>
+                       <p className="text-xs font-bold text-white">{profile.details.degreeName} ({profile.details.graduationYear})</p>
+                    </div>
+                  )}
+               </div>
+            </div>
+         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
@@ -169,17 +223,46 @@ const StudentDashboard = ({ token, account }) => {
                 </select>
               </div>
               
+              {/* Placement Type Selector */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Placement Type</label>
+                <div className="flex gap-2">
+                  {['full-time', 'internship', 'contract'].map(type => (
+                    <button key={type} type="button" onClick={() => setPlacementType(type)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
+                        placementType === type 
+                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/20' 
+                          : 'bg-slate-950 text-slate-500 border-slate-800 hover:border-slate-600'
+                      }`}>
+                      {type === 'full-time' ? '💼 Full-Time' : type === 'internship' ? '🎓 Internship' : '📋 Contract'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Role Title</label>
                   <input type="text" placeholder="Engineer" value={offerRole} onChange={(e) => setOfferRole(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-white outline-none focus:border-indigo-500 transition-all" required />
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-white outline-none focus:border-indigo-500 transition-all font-semibold" required />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Annual Package</label>
-                  <input type="number" placeholder="800000" value={offerSalary} onChange={(e) => setOfferSalary(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-white outline-none focus:border-indigo-500 transition-all font-mono" required />
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                    {placementType === 'internship' ? 'Stipend (₹0 if unpaid)' : 'Annual Package'}
+                  </label>
+                  <input type="number" placeholder={placementType === 'internship' ? '0' : '800000'} 
+                    value={offerSalary} onChange={(e) => setOfferSalary(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-white outline-none focus:border-indigo-500 transition-all font-mono" />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center justify-between">
+                  <span>Official Sender Email</span>
+                  <span className="text-indigo-400 font-bold lowercase tracking-normal bg-indigo-500/5 px-2 py-0.5 rounded-md border border-indigo-500/10">Required for domain validation</span>
+                </label>
+                <input type="email" placeholder="hr@company.com" value={offerSenderEmail} onChange={(e) => setOfferSenderEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-white outline-none focus:border-indigo-500 transition-all font-semibold" required />
               </div>
 
               {/* Real File Upload */}
@@ -243,7 +326,19 @@ const StudentDashboard = ({ token, account }) => {
                                 <div>
                                    <div className="flex items-center gap-3 mb-2">
                                       <h4 className="text-2xl font-black text-white">{p.role}</h4>
-                                      <span className="font-mono text-emerald-400 text-sm font-bold bg-emerald-400/10 px-3 py-1 rounded-xl border border-emerald-500/20">₹{parseInt(p.salary).toLocaleString()}</span>
+                                      {p.placementType === 'internship' ? (
+                                        <span className="text-xs font-black bg-purple-500/10 text-purple-400 px-3 py-1 rounded-xl border border-purple-500/20">
+                                          🎓 Internship{p.salary > 0 ? ` · ₹${parseInt(p.salary).toLocaleString()}` : ' · Unpaid'}
+                                        </span>
+                                      ) : p.placementType === 'contract' ? (
+                                        <span className="text-xs font-black bg-amber-500/10 text-amber-400 px-3 py-1 rounded-xl border border-amber-500/20">
+                                          📋 Contract · ₹{parseInt(p.salary).toLocaleString()}
+                                        </span>
+                                      ) : (
+                                        <span className="font-mono text-emerald-400 text-sm font-bold bg-emerald-400/10 px-3 py-1 rounded-xl border border-emerald-500/20">
+                                          ₹{parseInt(p.salary).toLocaleString()}
+                                        </span>
+                                      )}
                                    </div>
                                    <div className="flex items-center gap-4">
                                       <p className="text-slate-400 text-sm font-semibold italic">{p.companyName}</p>
@@ -255,11 +350,11 @@ const StudentDashboard = ({ token, account }) => {
                                    {/* Stage Progress */}
                                    <div className="flex justify-between items-center mb-1">
                                       <span className={`text-[10px] font-black uppercase tracking-widest ${p.status === 'salary_verified' ? 'text-emerald-500' : 'text-indigo-500'}`}>Verification Progress</span>
-                                      <span className="text-[10px] font-black text-slate-400">{p.status === 'pending_company_approval' ? '33%' : p.status === 'offer_verified' ? '50%' : p.status === 'joining_verified' ? '75%' : '100%'}</span>
+                                      <span className="text-[10px] font-black text-slate-400">{p.status === 'pending_company_approval' ? '20%' : p.status === 'offer_verified' ? '40%' : p.status === 'joining_pending' ? '60%' : p.status === 'joining_verified' ? '80%' : p.status === 'salary_pending' ? '90%' : '100%'}</span>
                                    </div>
                                    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                                       <div className={`h-full bg-indigo-500 transition-all duration-1000 ${p.status === 'salary_verified' ? 'bg-emerald-500' : ''}`} 
-                                        style={{ width: p.status === 'pending_company_approval' ? '33%' : p.status === 'offer_verified' ? '50%' : p.status === 'joining_verified' ? '75%' : '100%' }}></div>
+                                        style={{ width: p.status === 'pending_company_approval' ? '20%' : p.status === 'offer_verified' ? '40%' : p.status === 'joining_pending' ? '60%' : p.status === 'joining_verified' ? '80%' : p.status === 'salary_pending' ? '90%' : '100%' }}></div>
                                    </div>
                                    
                                    {/* ACTION BUTTONS BASED ON PHASE */}
@@ -268,21 +363,24 @@ const StudentDashboard = ({ token, account }) => {
                                         <div className="text-amber-500 bg-amber-500/10 px-4 py-2 rounded-xl text-center text-xs font-bold border border-amber-500/20">Awaiting Employer Review</div>
                                       )}
                                       {p.status === 'offer_verified' && (
-                                        <button onClick={() => verifyPhase('join', p.verificationCode)} 
-                                          className="w-full bg-white text-slate-900 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Phase 2: Verify Joining</button>
+                                        <button onClick={() => verifyPhase('join-upload', p.verificationCode)} 
+                                          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">Phase 2: Upload Joining Letter</button>
+                                      )}
+                                      {p.status === 'joining_pending' && (
+                                         <div className="text-amber-500 bg-amber-500/10 px-4 py-2 rounded-xl text-center text-xs font-bold border border-amber-500/20 italic animate-pulse">Employer Confirming Onboarding...</div>
                                       )}
                                       {p.status === 'joining_verified' && (
+                                         <button onClick={() => verifyPhase('salary-upload', p.verificationCode)} 
+                                           className="w-full bg-purple-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition-all shadow-lg shadow-purple-600/20">Phase 3: Upload Salary Slip</button>
+                                      )}
+                                      {p.status === 'salary_pending' && (
                                          <div className="flex flex-col gap-2">
-                                            <div className="bg-slate-950 border border-emerald-500/20 rounded-xl px-3 py-2">
-                                               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Algorand TX Hash (auto-filled)</p>
-                                               <p className="text-emerald-400 font-mono text-[10px] break-all">{p.txHash || 'Waiting for company to sign...'}</p>
-                                            </div>
                                             <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
-                                               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">First Month Salary (₹)</p>
-                                               <input type="number" placeholder="e.g. 100000" value={salaryAmount || p.salary} onChange={e => setSalaryAmount(e.target.value)} className="w-full bg-transparent text-white text-xs outline-none" />
+                                               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Confirm Net Salary Received (₹)</p>
+                                               <input type="number" placeholder="Enter amount..." value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} className="w-full bg-transparent text-white text-xs outline-none font-mono" />
                                             </div>
-                                           <button onClick={() => verifyPhase('salary', p.verificationCode, p.txHash)} 
-                                             className="w-full bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20">Phase 3: Complete Certification</button>
+                                           <button onClick={() => verifyPhase('salary-match', p.verificationCode, p.txHash)} 
+                                             className="w-full bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20">Verify Payroll & Complete</button>
                                         </div>
                                       )}
                                       {p.status === 'salary_verified' && (

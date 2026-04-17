@@ -17,7 +17,7 @@ const CollegeDashboard = ({ account, token }) => {
       const studentData = await studentRes.json();
       if (studentData.success) {
         setStudents(studentData.students);
-        const verified = studentData.students.filter(s => s.details?.isVerifiedByCollege).length;
+        const verified = studentData.students.filter(s => s.details?.collegeVerified).length;
         setStats({
           totalStudents: studentData.students.length,
           verifiedStudents: verified,
@@ -146,7 +146,7 @@ const CollegeDashboard = ({ account, token }) => {
                   </td>
                   <td className="px-8 py-6">
                      <div className="flex flex-col gap-1.5">
-                        {s.details?.isVerifiedByCollege ? (
+                        {s.details?.collegeVerified ? (
                           <span className="w-fit px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded text-[9px] font-black uppercase border border-indigo-500/20">Identity Sealed</span>
                         ) : (
                           <span className="w-fit px-2 py-0.5 bg-slate-800 text-slate-500 rounded text-[9px] font-black uppercase border border-slate-700">Unverified</span>
@@ -183,7 +183,7 @@ const CollegeDashboard = ({ account, token }) => {
                        </div>
                     ) : (
                       <div className="flex justify-end gap-2">
-                        {!s.details?.isVerifiedByCollege && (
+                        {!s.details?.collegeVerified && (
                           <button 
                             onClick={() => handleVerifyStudent(s.walletAddress)}
                             className="bg-white text-slate-900 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all transform active:scale-95"
@@ -191,7 +191,7 @@ const CollegeDashboard = ({ account, token }) => {
                             Seal Identity
                           </button>
                         )}
-                        {s.details?.isVerifiedByCollege && !s.details?.degreeVerified && (
+                        {s.details?.collegeVerified && !s.details?.degreeVerified && (
                           <button 
                             onClick={() => setVerifyingDegree(s.walletAddress)}
                             className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
