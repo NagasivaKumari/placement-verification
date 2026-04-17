@@ -2,11 +2,6 @@
 
 **TruePlacement** is an institutional-grade, anti-fraud ecosystem built for the **RegTech & DPDP** domain. Using the **Algorand Blockchain**, we eliminate "Ghost Placements" and fake college claims by anchoring every professional milestone in immutable, cryptographically-proven records.
 
-> [!IMPORTANT]
-> **No AI Needed:** Rather than trying to outsmart fraud with black-box ML algorithms, TruePlacement cuts directly to the source of truth via **Strict Document Uploads** and **Multi-Party Verification**. If the company hasn't issued the **Salary Slip** to match the blockchain hash, the placement is not certified.
-
----
-
 ## 🚀 The 4-Tier Zero-Trust Workflow
 
 ### Phase 1: Registration
