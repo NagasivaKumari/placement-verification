@@ -186,7 +186,16 @@ const Settings = ({ token, account, userRole }) => {
                                    
                                    {profile.details.resumeUrl && (
                                      <button 
-                                       onClick={() => window.open(profile.details.resumeUrl?.startsWith('http') ? profile.details.resumeUrl : `https://ipfs.io/ipfs/${profile.details.resumeUrl}`, '_blank')}
+                                       onClick={() => {
+                                         const url = profile.details.resumeUrl;
+                                         if (url.startsWith('http')) {
+                                           window.open(url, '_blank');
+                                         } else if (url.startsWith('Qm') || url.startsWith('ba')) {
+                                           window.open(`https://ipfs.io/ipfs/${url}`, '_blank');
+                                         } else {
+                                           alert(`" ${url} " is a local record. In a production environment, this file would be anchored to IPFS to provide a permanent CID.`);
+                                         }
+                                       }}
                                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
                                      >
                                        View
