@@ -9,6 +9,7 @@ const StudentDashboard = ({ token, account }) => {
   const [offerCompany, setOfferCompany] = useState("");
   const [offerRole, setOfferRole] = useState("");
   const [offerSalary, setOfferSalary] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
@@ -178,9 +179,31 @@ const StudentDashboard = ({ token, account }) => {
                 </div>
               </div>
 
-              <div className="border-2 border-dashed border-slate-800 rounded-2xl p-6 text-center group hover:border-indigo-500/50 transition-colors">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 group-hover:text-indigo-400">Drop Offer Letter PDF</p>
-                <span className="text-[10px] text-slate-600">Off-chain hashing enabled</span>
+              {/* Real File Upload */}
+              <div
+                className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${
+                  selectedFile ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-800 hover:border-indigo-500/50'
+                }`}
+                onClick={() => document.getElementById('offerFileInput').click()}
+              >
+                <input
+                  id="offerFileInput"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={(e) => setSelectedFile(e.target.files[0] || null)}
+                />
+                {selectedFile ? (
+                  <>
+                    <p className="text-indigo-400 font-bold text-sm mb-1">📄 {selectedFile.name}</p>
+                    <span className="text-[10px] text-slate-500">Click to change file</span>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 group-hover:text-indigo-400">📎 Click to Upload Offer Letter</p>
+                    <span className="text-[10px] text-slate-600">PDF, JPG, PNG accepted</span>
+                  </>
+                )}
               </div>
 
               <button type="submit" disabled={isUploading}

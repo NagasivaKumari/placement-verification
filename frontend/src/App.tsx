@@ -101,13 +101,13 @@ function App() {
       <Header account={account} token={token} userRole={userRole} onLogout={handleLogout} connectWallet={connectWallet} />
       <main className="flex-grow">
         <Routes>
-          <Route path="/" element={<Home account={account} setAccount={setAccount} setToken={setToken} setUserRole={setUserRole} connectWallet={connectWallet} showRoleModal={showRoleModal} setShowRoleModal={setShowRoleModal} />} />
+          <Route path="/" element={<Home account={account} setAccount={setAccount} setToken={setToken} userRole={userRole} setUserRole={setUserRole} connectWallet={connectWallet} showRoleModal={showRoleModal} setShowRoleModal={setShowRoleModal} />} />
           <Route 
             path="/company/dashboard" 
             element={
               token ?
                 <CompanyDashboard token={token} account={account} /> 
-                : <Home setAccount={setAccount} setToken={setToken} setUserRole={setUserRole} />
+                : <Home account={account} setAccount={setAccount} setToken={setToken} userRole={userRole} setUserRole={setUserRole} connectWallet={connectWallet} showRoleModal={showRoleModal} setShowRoleModal={setShowRoleModal} />
             } 
           />
           <Route 
@@ -115,7 +115,7 @@ function App() {
             element={
               token ? 
                 <StudentDashboard token={token} account={account} /> 
-                : <Home setAccount={setAccount} setToken={setToken} setUserRole={setUserRole} />
+                : <Home account={account} setAccount={setAccount} setToken={setToken} userRole={userRole} setUserRole={setUserRole} connectWallet={connectWallet} showRoleModal={showRoleModal} setShowRoleModal={setShowRoleModal} />
             } 
           />
           <Route 

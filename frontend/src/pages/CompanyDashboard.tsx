@@ -26,7 +26,10 @@ const CompanyDashboard = ({ token, account }) => {
     }
   };
 
+  const [verifying, setVerifying] = useState(null); // tracks which code is being verified
+
   const handleVerify = async (verificationCode) => {
+    setVerifying(verificationCode);
     try {
       const res = await fetch('http://localhost:8000/api/placements/company-verify', {
         method: 'POST',
@@ -38,23 +41,27 @@ const CompanyDashboard = ({ token, account }) => {
       });
       const data = await res.json();
       
-      if (data.success && data.unsignedTxn) {
-        // 1. Convert the txn from base64 string to Uint8Array
-        const txnBytes = new Uint8Array(Buffer.from(data.unsignedTxn, 'base64'));
-        
-        // 2. Wrap for Pera Wallet
-        const txnGroup = [{ txn: algosdk.decodeUnsignedTransaction(txnBytes), signers: [account] }];
-        
-        // 3. User Signs in Pera Wallet browser extension
-        const signedTxns = await peraWallet.signTransaction([txnGroup]);
-        
-        // 4. Success feedback
-        alert("Success: Placement cryptographically signed and archived on Algorand.");
-        fetchPlacements(); 
+      if (data.success) {
+        // Status updated on backend — try Pera signing if available (non-blocking)
+        if (data.unsignedTxn && account) {
+          try {
+            const txnBytes = new Uint8Array(Buffer.from(data.unsignedTxn, 'base64'));
+            const txnGroup = [{ txn: algosdk.decodeUnsignedTransaction(txnBytes), signers: [account] }];
+            await peraWallet.signTransaction([txnGroup]);
+          } catch (sigErr) {
+            // Signing optional — status already updated in DB
+            console.warn("Pera signing skipped:", sigErr);
+          }
+        }
+        fetchPlacements(); // Always refresh
+      } else {
+        alert(data.detail || "Verification failed. Please try again.");
       }
     } catch (err) {
       console.error("Verification error:", err);
-      alert("Verification failed or user rejected signing.");
+      alert("Network error. Please check if the backend is running.");
+    } finally {
+      setVerifying(null);
     }
   };
 
@@ -142,9 +149,10 @@ const CompanyDashboard = ({ token, account }) => {
                       {p.status === 'pending_company_approval' ? (
                         <button 
                           onClick={() => handleVerify(p.verificationCode)}
-                          className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95"
+                          disabled={verifying === p.verificationCode}
+                          className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-wait"
                         >
-                          Approve Claim
+                          {verifying === p.verificationCode ? 'Signing...' : 'Approve Claim'}
                         </button>
                       ) : (
                          <div className="text-slate-600 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest">

@@ -4,7 +4,7 @@ import { PeraWalletConnect } from '@perawallet/connect';
 
 import { peraWallet } from '../wallet';
 
-const Home = ({ account, setAccount, setToken, setUserRole, connectWallet, showRoleModal, setShowRoleModal }) => {
+const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWallet, showRoleModal, setShowRoleModal }) => {
   const [walletError, setWalletError] = useState("");
   const [selectedRole, setSelectedRole] = useState("company");
   const [userName, setUserName] = useState("");
@@ -125,7 +125,7 @@ const Home = ({ account, setAccount, setToken, setUserRole, connectWallet, showR
                   />
                   <input
                     type="text"
-                    placeholder="Year of Study / Graduation Year"
+                    placeholder="Graduation Year (e.g. 2025)"
                     value={studentYear || ""}
                     onChange={e => setStudentYear(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
@@ -206,26 +206,19 @@ const Home = ({ account, setAccount, setToken, setUserRole, connectWallet, showR
         </div>
       )}
 
-      {/* Wallet Connect Section */}
-      {!account ? (
-        <div className="flex justify-center items-center py-8">
-          <button onClick={connectWallet} className="btn-primary px-8 py-3 text-lg">Connect Pera Wallet</button>
-          {walletError && <p className="text-red-500 ml-4">{walletError}</p>}
+      {/* Wallet Connect Banner - Only shown if connected but no role yet */}
+      {account && !userRole && !showRoleModal && (
+        <div className="container-custom">
+           <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-2xl p-6 mb-8 flex items-center justify-between">
+              <div>
+                 <h4 className="text-white font-bold text-lg">Account Connected: {account.slice(0, 8)}...</h4>
+                 <p className="text-slate-400 text-sm">Please complete your profile to access your dashboard.</p>
+              </div>
+              <button onClick={() => setShowRoleModal(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg">
+                 Complete Registration
+              </button>
+           </div>
         </div>
-      ) : (
-        !userRole && !showRoleModal && (
-          <div className="container-custom">
-             <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-2xl p-6 mb-8 flex items-center justify-between">
-                <div>
-                   <h4 className="text-white font-bold text-lg">Account Connected: {account.slice(0, 8)}...</h4>
-                   <p className="text-slate-400 text-sm">Please finalize your profile to access your professional dashboard.</p>
-                </div>
-                <button onClick={() => setShowRoleModal(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg">
-                   Complete Registration
-                </button>
-             </div>
-          </div>
-        )
       )}
 
       {/* Hero Section */}
@@ -385,16 +378,6 @@ const Home = ({ account, setAccount, setToken, setUserRole, connectWallet, showR
             </div>
          </div>
       </section>
-      <div className="flex flex-col items-center gap-4">
-        <button className="btn-primary w-full sm:w-auto text-lg py-4 px-10" onClick={connectWallet}>
-          Connect Pera Wallet
-        </button>
-        {account && (
-          <div className="text-white">
-            Connected: {account}
-          </div>
-        )}
-      </div>
     </div>
   );
 };
