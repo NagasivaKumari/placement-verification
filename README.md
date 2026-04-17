@@ -1,70 +1,72 @@
-# 🛡️ TruePlacement: Educational RegTech & DPDP Platform
+# 🛡️ CollegeTruth: The Decentralized Talent Ledger
 
 **TruePlacement** is an institutional-grade, anti-fraud ecosystem built for the **RegTech & DPDP** domain. Using the **Algorand Blockchain**, we eliminate "Ghost Placements" and fake college claims by anchoring every professional milestone in immutable, cryptographically-proven records.
 
-## 🚀 The 4-Tier Zero-Trust Workflow
-
-### Phase 1: Registration
-- **Students**: Upload College ID, Aadhaar, Marksheets.
-- **Colleges**: Verify student identity and academic status.
-- **Companies**: Register via Government Database checks (GST, PAN).
-
-### Phase 2: Placement Process (Tier 1 & 2)
-1. **Student applies** to a verified company.
-2. **Company reviews & issues an offer**, uploading the official Offer Letter (Tier 1 - Documented).
-3. **Student natively signs** from their Algorand Pera Wallet to accept (Tier 2 - Witnessed).
-
-### Phase 3: Joining (Tier 3)
-1. **Student joins** the company and uploads the joining letter.
-2. **Company confirms** their physical/biometric joining and HR validates the onboarding event.
-
-### Phase 4: Salary & Finality (Tier 4)
-1. **Company pays** the first month's salary, uploading the verified Salary Slip.
-2. **Blockchain records** the hash of the salary proof.
-3. The Placement is now **100% Certified**, and counts toward the College's un-fakeable statistics!
+> [!IMPORTANT]
+> **No AI Needed:** Rather than trying to outsmart fraud with black-box ML algorithms, TruePlacement cuts directly to the source of truth via **Strict Document Uploads** and **Multi-Party Verification**. If the company hasn't issued the **Salary Slip** to match the blockchain hash, the placement is not certified.
 
 ---
 
-## 💎 Why RegTech & DPDP?
-- **Regulatory compliance**: Forces placement bodies to adhere to standardized state criteria.
-- **Document verification**: Ensures explicit photographic proof for IDs and letters.
-- **Data protection**: All private identifiable info is localized and secured; only hashes touch the ledger.
+## 💡 The Solution: "On-Chain Talent Ledger"
+CollegeTruth solves these problems by moving the entire career lifecycle onto a **Soulbound Asset Pipeline**:
+
+*   **Immutable Identity**: Students don't just "create an account"; they anchor their identity on the blockchain. Every verification is cryptographically signed.
+*   **The 3-Key Verification**: A placement is only "Green-Lit" when three independent parties sign off:
+    1.  The **Student** (Accepts the offer).
+    2.  The **Employer** (Verifies onboarding and biometric presence).
+    3.  The **Payroll Anchor** (Logs the hash of the first salary payment).
+*   **Fractional Trust Scores**: Instead of a "Yes/No" verification, our system builds a **Trust Reputation** over time based on real, on-chain events.
+
+---
+
+## 🚀 Key Features
+
+### 🎓 For Students (Talent Portal)
+*   **On-Chain Identity**: Register and anchor your institutional identity via Pera/Lute Wallet.
+*   **SBT Verification**: Earn Soulbound Tokens (SBTs) for academic and professional milestones.
+*   **Placement Tracker**: A cinematic timeline tracking your offer, joining, and payroll verification phases.
+*   **Professional Trust Score**: A dynamic reputation score calculated based on real, immutable evidence.
+
+### 🏢 For Companies (Verified Employers)
+*   **Secure Hiring**: Verify student claims against authenticated college records in seconds.
+*   **Domain-Locked Offers**: Protect your brand; students can only claim offers from your official corporate email domain.
+*   **Payroll Sync**: Seal the trust loop by hashing salary proofs on-chain.
+
+### 🏛️ For Colleges (Institutional Audit)
+*   **Un-fakeable Statistics**: Automatically generated NIRF/NAAC-ready placement reports.
+*   **Student Registry**: Manage and approve students' enrollment status before they enter the Ledger.
+*   **Transparancy Leaderboard**: Public rankings of colleges based on **verified outcomes**, not self-reported numbers.
 
 ---
 
 ## 🛠️ Technology Stack
-- **Frontend**: React.js, TailwindCSS (Using `@perawallet/connect`).
-- **Backend APIs**: Node.js, Express.js.
-- **Database**: PostgreSQL (Structural models) / MongoDB (Document Caching).
-- **Blockchain**: Algorand TestNet (Smart Contracts for immutable records).
-- **Storage**: Simulated IPFS/S3 block-storage for Document Photos.
+
+*   **Frontend**: React (Vite), TypeScript, TailwindCSS.
+*   **Backend**: Python 3.11, FastAPI.
+*   **Blockchain**: Algorand (py-algorand-sdk).
+*   **Database**: MongoDB Atlas.
+*   **Wallet**: @perawallet/connect.
 
 ---
 
-## 🏁 Quick Start: Running the MVP Locally
+## ⛓️ The On-Chain Verification Loop
 
-### 1. Environment Variables
-Create a `.env` in the `backend` folder:
-```env
-MONGODB_URI=mongodb+srv://nagashivakota_db_user:password@cluster0...
-JWT_SECRET=your_secret_key
-PORT=3000
-```
+CollegeTruth uses a **Zero-Knowledge-Inspired Trust Loop**:
+1.  **Identity Anchor**: Secure registration signed on-chain.
+2.  **Offer Proof**: Metadata hashes of Job Offers stored on the ledger.
+3.  **Joining Event**: HR-signed "Physical Onboarding" milestone.
+4.  **Payroll Seal**: The final level of trust. A payment hash (salary) is anchored.
 
-### 2. Start Backend & Frontend
-Launch your terminal and start both the servers:
-```bash
-# In /backend
-npm install
-npm run dev
+---
 
-# In /frontend
-npm install
-npm run dev
-```
+## 🏁 Setup & Deployment
 
-### 3. Usage Flow
-- Go to `http://localhost:5175`
-- Click **"Connect Pera Wallet"**.
-- During initial login, pick your Role: `college`, `company`, or `student`.
-- Once logged in, navigate the header to reach your specialized Dashboard!
+Refer to the internal documentation in the `backend/` and `frontend/` folders for specific environment variables and configuration steps.
+
+**Backend Deployment**: Render (via Docker)
+**Frontend Deployment**: Vercel
+
+---
+
+## 📜 License
+Licensed under the MIT License. Developed for the Algorand Blockchain ecosystem.
