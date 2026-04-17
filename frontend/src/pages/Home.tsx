@@ -2,13 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PeraWalletConnect } from '@perawallet/connect';
 
-// Initialize Pera Wallet Connect
-const peraWallet = new PeraWalletConnect();
+import { peraWallet } from '../wallet';
 
-const Home = ({ setAccount, setToken, setUserRole }) => {
-  const [walletAddress, setWalletAddress] = useState(null);
+const Home = ({ account, setAccount, setToken, setUserRole, connectWallet, showRoleModal, setShowRoleModal }) => {
   const [walletError, setWalletError] = useState("");
-  const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState("company");
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -27,90 +24,31 @@ const Home = ({ setAccount, setToken, setUserRole }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Reconnect to the session when the component is mounted
-    peraWallet
-      .reconnectSession()
-      .then((accounts) => {
-        if (accounts.length) {
-          handleConnect(accounts[0]);
-        }
-      })
-      .catch((e) => console.log(e));
+    // Automatic reconnect Disabled intentionally for UX
   }, []);
-
-  const connectWallet = async () => {
-    try {
-      const newAccounts = await peraWallet.connect();
-      if (newAccounts.length > 0) {
-        handleConnect(newAccounts[0]);
-      }
-    } catch (error) {
-      if (error?.data?.type !== "CONNECT_MODAL_CLOSED") {
-        setWalletError("Wallet connection failed.");
-      }
-    }
-  };
-
-  const handleConnect = async (accountAddress) => {
-    setWalletAddress(accountAddress);
-    if (setAccount) setAccount(accountAddress);
-    setWalletError("");
-
-    // Call backend to authenticate
-    try {
-      const response = await fetch('http://localhost:3000/api/auth/verify-signature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wallet: accountAddress, signature: 'pera-signature-placeholder' })
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        if (setToken) setToken(data.token);
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('userAccount', accountAddress);
-        
-        if (data.role) {
-            localStorage.setItem('userRole', data.role);
-            if (setUserRole) setUserRole(data.role);
-            // navigate to respective dashboard
-            navigate(`/${data.role}/dashboard`);
-        } else {
-            // Wait to get roles
-            setShowRoleModal(true);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      setWalletError("Backend authentication failed.");
-    }
-  };
 
   const registerRole = async () => {
     try {
-      let payload = { wallet: walletAddress, role: selectedRole, name: userName, email: userEmail };
+      let payload = { wallet: account, role: selectedRole, name: userName, email: userEmail, details: {} };
       if (selectedRole === "student") {
-        payload = {
-          ...payload,
+        payload.details = {
           college: studentCollege,
           enrollmentId: studentId,
           course: studentCourse,
           year: studentYear
         };
       } else if (selectedRole === "college") {
-        payload = {
-          ...payload,
+        payload.details = {
           collegeId: collegeId,
           cityState: collegeCity
         };
       } else if (selectedRole === "company") {
-        payload = {
-          ...payload,
+        payload.details = {
           companyId: companyId,
           industry: companyIndustry
         };
       }
-      const response = await fetch('http://localhost:3000/api/auth/register-role', {
+      const response = await fetch('http://localhost:8000/api/auth/register-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -132,7 +70,8 @@ const Home = ({ setAccount, setToken, setUserRole }) => {
       {/* Role Selection Modal */}
       {showRoleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-[#0f172a] rounded-2xl border border-white/10 p-8 max-w-md w-full shadow-2xl">
+          <div className="bg-[#0f172a] rounded-2xl border border-white/10 p-8 max-w-md w-full shadow-2xl relative">
+            <button onClick={() => setShowRoleModal(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white text-xl font-bold">✕</button>
             <h3 className="text-2xl font-bold text-white mb-2">Complete Profile</h3>
             <p className="text-slate-400 mb-6 font-semibold">Select your role to view your dashboard.</p>
             <div className="flex flex-col gap-4 mb-6">
@@ -268,7 +207,7 @@ const Home = ({ setAccount, setToken, setUserRole }) => {
       )}
 
       {/* Wallet Connect Section */}
-      {!walletAddress && (
+      {!account && (
         <div className="flex justify-center items-center py-8">
           <button onClick={connectWallet} className="btn-primary px-8 py-3 text-lg">Connect Pera Wallet</button>
           {walletError && <p className="text-red-500 ml-4">{walletError}</p>}
@@ -377,9 +316,9 @@ const Home = ({ setAccount, setToken, setUserRole }) => {
         <button className="btn-primary w-full sm:w-auto text-lg py-4 px-10" onClick={connectWallet}>
           Connect Pera Wallet
         </button>
-        {walletAddress && (
+        {account && (
           <div className="text-white">
-            Connected: {walletAddress}
+            Connected: {account}
           </div>
         )}
       </div>

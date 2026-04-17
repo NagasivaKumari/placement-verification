@@ -10,7 +10,7 @@ const VerifyPlacement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const API_URL = 'http://localhost:3000';
+  const API_URL = 'http://localhost:8000';
 
   const handleLookup = async (e) => {
     e.preventDefault();

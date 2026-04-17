@@ -7,7 +7,7 @@ const CollegeDashboard = ({ account, token }) => {
   const [error, setError] = useState(null);
   const [anomalyFlag, setAnomalyFlag] = useState(false);
 
-  const API_URL = 'http://localhost:3000';
+  const API_URL = 'http://localhost:8000';
 
   useEffect(() => {
     const fetchData = async () => {

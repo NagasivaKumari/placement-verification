@@ -1,70 +1,63 @@
 import os
-from algosdk.v2client import algod
-from algosdk import mnemonic
-from algosdk.transaction import ApplicationCreateTxn
+from pathlib import Path
 from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv("../.env")
-ALGOD_TOKEN = os.getenv("ALGOD_TOKEN")
-ALGOD_SERVER = os.getenv("ALGOD_SERVER")
-ALGOD_PORT = os.getenv("ALGOD_PORT")
-ALGOD_MNEMONIC = os.getenv("ALGOD_MNEMONIC")
-
-
-private_key = mnemonic.to_private_key(ALGOD_MNEMONIC)
-from algosdk.account import address_from_private_key
-account_address = address_from_private_key(private_key)
-
-algod_client = algod.AlgodClient(ALGOD_TOKEN, ALGOD_SERVER, ALGOD_PORT)
-
-# Utility to read TEAL code
-with open("../../contracts/build/PlacementStudent.approval.teal") as f:
-    approval_program = f.read()
-with open("../../contracts/build/PlacementStudent.clear.teal") as f:
-    clear_program = f.read()
-
-
-# Compile TEAL
+import algokit_utils
+from algosdk.v2client.algod import AlgodClient
+from algosdk.transaction import SuggestedParams
 import base64
-approval_result = algod_client.compile(approval_program)
-clear_result = algod_client.compile(clear_program)
 
-# Define schema (example: 2 uints, 2 byte slices global/local)
-global_schema = dict(num_uints=2, num_byte_slices=2)
-local_schema = dict(num_uints=2, num_byte_slices=2)
+load_dotenv(Path(__file__).parent.parent.parent / '.env')
 
+def deploy_contracts():
+    print("Initializing AlgoKit Client...")
+    
+    server = os.getenv("ALGOD_SERVER", "https://testnet-api.algonode.cloud")
+    port = os.getenv("ALGOD_PORT", "443")
+    token = os.getenv("ALGOD_TOKEN", "")
+    mnemonic = os.getenv("ALGOD_MNEMONIC")
+    
+    if not mnemonic:
+        raise ValueError("ALGOD_MNEMONIC not set in .env")
+        
+    algod_client = AlgodClient(token, server)
+    account = algokit_utils.get_account_from_mnemonic(mnemonic)
+    print(f"Deployer Account: {account.address}")
+    
+    approval_path = Path(__file__).parent.parent.parent / "contracts" / "build" / "PlacementStudent.approval.teal"
+    clear_path = Path(__file__).parent.parent.parent / "contracts" / "build" / "PlacementStudent.clear.teal"
+    
+    if not approval_path.exists():
+        raise FileNotFoundError(f"Cannot find compiled TEAL contracts! Path checked: {approval_path}")
+        
+    print("Compiling TEAL code...")
+    with open(approval_path, "r") as f:
+        compiled_approval = algod_client.compile(f.read())
+    with open(clear_path, "r") as f:
+        compiled_clear = algod_client.compile(f.read())
+        
+    print("Sending and confirming transaction on TestNet...")
+    sp = algod_client.suggested_params()
+    
+    from algosdk.transaction import ApplicationCreateTxn, StateSchema
+    
+    txn = ApplicationCreateTxn(
+        sender=account.address,
+        sp=sp,
+        on_complete=0,
+        approval_program=base64.b64decode(compiled_approval['result']),
+        clear_program=base64.b64decode(compiled_clear['result']),
+        global_schema=StateSchema(num_uints=2, num_byte_slices=2),
+        local_schema=StateSchema(num_uints=2, num_byte_slices=2)
+    )
+    
+    signed_txn = txn.sign(account.private_key)
+    txid = algod_client.send_transaction(signed_txn)
+    print(f"Transaction Sent: {txid}")
+    
+    import algosdk
+    confirmation = algosdk.transaction.wait_for_confirmation(algod_client, txid, 4)
+    print("\n🚀 CONTRACT SUCCESSFULLY DEPLOYED TO TESTNET 🚀")
+    print(f"App ID: {confirmation.get('application-index')}")
 
-# Create application transaction
-from algosdk.future.transaction import StateSchema
-params = algod_client.suggested_params()
-txn = ApplicationCreateTxn(
-    sender=account_address,
-    sp=params,
-    on_complete=0,  # NoOp
-    approval_program=base64.b64decode(approval_result["result"]),
-    clear_program=base64.b64decode(clear_result["result"]),
-    global_schema=StateSchema(**global_schema),
-    local_schema=StateSchema(**local_schema)
-)
-
-# Sign and send
-signed_txn = txn.sign(private_key)
-txid = algod_client.send_transaction(signed_txn)
-print(f"Transaction ID: {txid}")
-
-# Wait for confirmation
-import time
-def wait_for_confirmation(client, txid):
-    last_round = client.status().get('last-round')
-    while True:
-        txinfo = client.pending_transaction_info(txid)
-        if txinfo.get('confirmed-round', 0) > 0:
-            print(f"Confirmed in round {txinfo['confirmed-round']}")
-            return txinfo
-        print("Waiting for confirmation...")
-        last_round += 1
-        client.status_after_block(last_round)
-
-wait_for_confirmation(algod_client, txid)
-print("Contract deployed!")
+if __name__ == "__main__":
+    deploy_contracts()

@@ -5,7 +5,7 @@ const CollegeLeaderboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'http://localhost:8000';
 
     useEffect(() => {
         const fetchStats = async () => {

@@ -23,13 +23,24 @@ const Header = ({ account, token, userRole, connectWallet, onLogout }) => {
           </Link>
 
           <nav className="hidden md:flex items-center gap-2">
-            <Link to="/" className={`nav-link ${isActive('/') ? 'nav-link-active' : ''}`}>Home</Link>
-            <Link to="/leaderboard" className={`nav-link ${isActive('/leaderboard') ? 'nav-link-active' : ''}`}>Leaderboard</Link>
-            <Link to="/verify" className={`nav-link ${isActive('/verify') ? 'nav-link-active' : ''}`}>Verify Student</Link>
-            {account && userRole && (
-              <Link to={`/${userRole}/dashboard`} className={`nav-link ${isActive(`/${userRole}/dashboard`) ? 'nav-link-active' : ''}`}>
-                {userRole.charAt(0).toUpperCase() + userRole.slice(1)} Dashboard
-              </Link>
+            {!userRole ? (
+              <>
+                <Link to="/" className={`nav-link ${isActive('/') ? 'nav-link-active' : ''}`}>Home</Link>
+                <Link to="/leaderboard" className={`nav-link ${isActive('/leaderboard') ? 'nav-link-active' : ''}`}>Leaderboard</Link>
+                <Link to="/verify" className={`nav-link ${isActive('/verify') ? 'nav-link-active' : ''}`}>Verify Proofs</Link>
+              </>
+            ) : (
+              <>
+                <Link to={`/${userRole}/dashboard`} className={`nav-link ${isActive(`/${userRole}/dashboard`) ? 'nav-link-active' : ''}`}>
+                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)} Dashboard
+                </Link>
+                {userRole === 'college' && (
+                  <Link to="/leaderboard" className={`nav-link ${isActive('/leaderboard') ? 'nav-link-active' : ''}`}>Global Ranks</Link>
+                )}
+                {userRole === 'company' && (
+                  <Link to="/verify" className={`nav-link ${isActive('/verify') ? 'nav-link-active' : ''}`}>Audit Network</Link>
+                )}
+              </>
             )}
           </nav>
 
@@ -40,6 +51,11 @@ const Header = ({ account, token, userRole, connectWallet, onLogout }) => {
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{userRole ? userRole : 'Verified'} Account</p>
                   <p className="text-xs text-white font-mono">{account.slice(0, 6)}...{account.slice(-4)}</p>
                 </div>
+                {userRole && (
+                    <Link to={`/${userRole}/settings`} className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-white/5" title="Settings">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </Link>
+                )}
                 <button 
                   onClick={onLogout}
                   className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl transition-colors border border-white/5"
