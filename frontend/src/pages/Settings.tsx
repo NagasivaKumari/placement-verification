@@ -37,12 +37,18 @@ const Settings = ({ token, account, userRole }) => {
   const handleFileUpload = (e, type) => {
     const file = e.target.files[0];
     if (file) {
-      // In a real app, you'd upload to S3/IPFS here. 
-      // For this demo, we'll use a local URL.
-      const fakeUrl = URL.createObjectURL(file);
-      if (type === 'avatar') handleDetail('avatar', fakeUrl);
-      if (type === 'resume') handleDetail('resumeUrl', file.name); // Just show filename for now
-      setMessage(`"${file.name}" ready for synchronization.`);
+      if (type === 'avatar') {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          handleDetail('avatar', reader.result);
+          setMessage("Avatar updated. Don't forget to click 'Seal Changes'.");
+        };
+        reader.readAsDataURL(file);
+      } else if (type === 'resume') {
+        // Fallback for resume filename
+        handleDetail('resumeUrl', file.name);
+        setMessage(`"${file.name}" ready for synchronization.`);
+      }
     }
   };
 
@@ -142,7 +148,7 @@ const Settings = ({ token, account, userRole }) => {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
                        </button>
                     </div>
-                    <div className="flex-1 w-full space-y-4">
+                     <div className="flex-1 w-full space-y-4">
                         <div className="grid md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Legal Display Name</label>
@@ -153,10 +159,9 @@ const Settings = ({ token, account, userRole }) => {
                               <input type="email" value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})} className="bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3 w-full text-white font-bold focus:border-indigo-500 transition-all outline-none" />
                            </div>
                         </div>
-                        <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-3 flex items-center justify-between">
-                           <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Avatar Selection</p>
-                           <button onClick={() => avatarInputRef.current.click()} className="text-[10px] text-white font-black uppercase underline">Change Image</button>
-                        </div>
+                        <p className="text-[10px] text-slate-500 italic mt-2">
+                          <span className="text-indigo-400 font-black">Note:</span> Click the camera icon on the left to update your profile avatar. Use a permanent link (like Imgur) for cross-device persistence.
+                        </p>
                     </div>
                   </div>
 

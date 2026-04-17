@@ -1,9 +1,20 @@
 # 🛡️ CollegeTruth: The Decentralized Talent Ledger
 
-**TruePlacement** is an institutional-grade, anti-fraud ecosystem built for the **RegTech & DPDP** domain. Using the **Algorand Blockchain**, we eliminate "Ghost Placements" and fake college claims by anchoring every professional milestone in immutable, cryptographically-proven records.
+**CollegeTruth** is a next-generation regulatory technology (RegTech) platform designed to restore integrity to the higher education ecosystem. By leveraging the **Algorand Blockchain**, we provide a fraud-proof foundation for verifying academic and professional credentials.
 
-> [!IMPORTANT]
-> **No AI Needed:** Rather than trying to outsmart fraud with black-box ML algorithms, TruePlacement cuts directly to the source of truth via **Strict Document Uploads** and **Multi-Party Verification**. If the company hasn't issued the **Salary Slip** to match the blockchain hash, the placement is not certified.
+---
+
+## 🎯 Vision
+Our vision is to create a **transparent global economy** where career milestones are as immutable as the laws of physics. We aim to empower students with ownership of their verified achievements while protecting employers and government bodies from systemic institutional fraud.
+
+---
+
+## ⚠️ The Problem
+In the current educational landscape, "Ghost Placements" and credential inflation have become a billion-dollar crisis:
+1.  **Institutional Fraud**: Colleges often inflate placement statistics by creating fake "success stories" to attract more students.
+2.  **Verification Lag**: Companies spend weeks and thousands of dollars manually verifying candidate backgrounds.
+3.  **Credential Forgery**: Traditional PDF-based offer letters and salary slips can be easily altered with simple editing software.
+4.  **Lack of Accountability**: There is no centralized, tamper-proof record of whether a student's career claim is actually backed by physical employment and payroll history.
 
 ---
 

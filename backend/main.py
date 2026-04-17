@@ -433,16 +433,30 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
 @app.put("/api/user/profile")
 async def update_user_profile(req: UserProfileUpdateRequest, user: dict = Depends(get_current_user)):
     wallet = user["wallet"]
+    
+    # SECURITY LOOPHOLE FIX: Prevent users from self-verifying or inflating trust scores
+    sensitive_fields = ["trustScore", "collegeVerified", "degreeVerified", "identityTx"]
+    sanitized_details = req.details.copy() if req.details else {}
+    
+    # We fetch the existing user to preserve their real verification status
+    existing_user = await db["users"].find_one({"walletAddress": wallet})
+    if existing_user and "details" in existing_user:
+        for field in sensitive_fields:
+            if field in existing_user["details"]:
+                sanitized_details[field] = existing_user["details"][field]
+            else:
+                sanitized_details.pop(field, None)
+
     await db["users"].update_one(
         {"walletAddress": wallet},
         {"$set": {
             "name": req.name,
             "email": req.email,
-            "details": req.details,
+            "details": sanitized_details,
             "updatedAt": datetime.utcnow()
         }}
     )
-    return {"success": True, "message": "Profile updated successfully."}
+    return {"success": True, "message": "Profile updated successfully (Protected fields preserved)."}
 
 @app.get("/api/company/stats")
 async def get_company_stats(user: dict = Depends(get_current_user)):
