@@ -93,6 +93,7 @@ class RegisterRoleRequest(BaseModel):
     name: Optional[str] = ""
     email: Optional[str] = ""
     otp: str # New: Required OTP
+    identityTx: Optional[str] = None # New: Real TxID from frontend
     details: Optional[Dict[str, Any]] = {}
 
 class OTPRequest(BaseModel):
@@ -116,6 +117,7 @@ class StudentUploadOfferRequest(BaseModel):
     placementType: Optional[str] = "full-time"  # "full-time" | "internship" | "contract"
     senderEmail: str
     documentHash: Optional[str] = "offchain_ipfs_link_or_hash"
+    txHash: Optional[str] = None # Added for real anchoring proof
     
 class CompanyApproveRequest(BaseModel):
     verificationCode: str
@@ -530,6 +532,7 @@ async def student_upload_offer(req: StudentUploadOfferRequest, user: dict = Depe
         "companyWallet": req.companyWallet.lower(),
         "documentHash": req.documentHash,
         "verificationCode": vCode,
+        "txHash": req.txHash, # Real transaction hash from Algorand
         "status": "pending_company_approval",
         "appliedAt": datetime.utcnow(),
         "createdAt": datetime.utcnow()

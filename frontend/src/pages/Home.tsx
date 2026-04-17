@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PeraWalletConnect } from '@perawallet/connect';
 
 import { peraWallet } from '../wallet';
+import { signAndSendRegistration } from '../utils/algorand';
 
 const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWallet, showRoleModal, setShowRoleModal }) => {
   const [walletError, setWalletError] = useState("");
@@ -63,13 +64,29 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
 
   const registerRole = async () => {
     setRegError("");
+    setLoading(true);
     try {
+      let registrationTxId = null;
+      
+      // REAL BLOCKCHAIN TRANSACTION FOR STUDENTS
+      if (selectedRole === "student") {
+        try {
+          registrationTxId = await signAndSendRegistration(account, selectedRole);
+          console.log("On-chain registration success:", registrationTxId);
+        } catch (txnError) {
+          setRegError("Blockchain transaction rejected by user or network.");
+          setLoading(false);
+          return;
+        }
+      }
+
       let payload: any = { 
         wallet: account, 
         role: selectedRole, 
         name: userName, 
         email: userEmail, 
         otp: userOtp, 
+        identityTx: registrationTxId, // Pass the real TxID
         details: {} 
       };
       if (selectedRole === "student") {
@@ -81,9 +98,11 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
           year: studentYear,
           cgpa: studentCgpa,
           phone: studentPhone,
-          collegeVerified: false  // Must be verified by college before applying
+          collegeVerified: false 
         };
-      } else if (selectedRole === "college") {
+      }
+      // ... (rest of the detailed payloads for other roles)
+      else if (selectedRole === "college") {
         payload.details = {
           collegeId: collegeId,
           cityState: collegeCity,
@@ -102,6 +121,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
           cin: companyCin
         };
       }
+      
       const response = await fetch('http://localhost:8000/api/auth/register-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,6 +138,8 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
       }
     } catch (e) {
       setRegError("Network error during registration.");
+    } finally {
+      setLoading(false);
     }
   };
 

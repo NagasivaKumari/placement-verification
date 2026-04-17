@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+import { signAndSendPlacementClaim } from '../utils/algorand';
+
 const StudentDashboard = ({ token, account }) => {
   const [placements, setPlacements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,25 @@ const StudentDashboard = ({ token, account }) => {
     if (!offerCompany) { setUploadMessage("Select target employer."); return; }
     setIsUploading(true);
     setUploadMessage("");
+    
     try {
+      // 1. REAL BLOCKCHAIN TRANSACTION (ANCHOR THE CLAIM)
+      let claimTxId = null;
+      try {
+        claimTxId = await signAndSendPlacementClaim(
+          account, 
+          offerCompany, 
+          offerRole, 
+          offerSalary
+        );
+        console.log("Placement claim anchored:", claimTxId);
+      } catch (txnError) {
+        setUploadMessage("Transaction rejected. Claim not published.");
+        setIsUploading(false);
+        return;
+      }
+
+      // 2. SEND METADATA TO BACKEND
       const res = await fetch('http://localhost:8000/api/placements/student-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -72,16 +92,21 @@ const StudentDashboard = ({ token, account }) => {
           salary: parseFloat(offerSalary) || 0,
           placementType: placementType,
           senderEmail: offerSenderEmail,
-          documentHash: "ipfs_offchain_" + Date.now().toString(16)
+          documentHash: "ipfs_offchain_" + Date.now().toString(16),
+          txHash: claimTxId // Save the real TxID
         })
       });
+      
       if (res.ok) {
-        setUploadMessage("Offer anchored to blockchain. Awaiting HR signature.");
+        setUploadMessage("Success! Claim anchored with TxID: " + claimTxId.slice(0, 8) + "...");
         setOfferRole(""); setOfferSalary(""); setSelectedFile(null);
         fetchPlacements();
       }
-    } catch (err) { setUploadMessage("Network failure during anchoring."); }
-    finally { setIsUploading(false); }
+    } catch (err) { 
+      setUploadMessage("Network failure during anchoring."); 
+    } finally { 
+      setIsUploading(false); 
+    }
   };
 
   const verifyPhase = async (phase, code) => {
@@ -307,11 +332,6 @@ const StudentDashboard = ({ token, account }) => {
 
       </div>
     </div>
-  );
-};
-
-export default StudentDashboard;
->
   );
 };
 
