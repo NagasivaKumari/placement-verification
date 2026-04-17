@@ -163,17 +163,34 @@ const VerifyPlacement = () => {
                   {collegeResults.map((p, idx) => {
                     const badge = statusLabel(p.status);
                     return (
-                      <div key={idx} className="premium-card hover:border-indigo-500/30 transition-all group">
+                      <div key={idx} className="premium-card hover:border-emerald-500/30 transition-all group">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div>
-                            <h3 className="text-xl font-black text-white group-hover:text-indigo-400 transition-colors">{p.studentName}</h3>
+                            <h3 className="text-xl font-black text-white group-hover:text-emerald-400 transition-colors">{p.studentName}</h3>
                             <p className="text-slate-400 text-sm font-semibold">{p.role} <span className="text-slate-600">at</span> <span className="text-indigo-400 font-bold">{p.companyName}</span></p>
                             <p className="text-emerald-400 font-mono font-bold text-sm mt-1">₹{parseInt(p.salary).toLocaleString()} / year</p>
                           </div>
                           <div className="flex flex-col items-start md:items-end gap-2">
-                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${badge.color}`}>
-                              ✓ {badge.text}
+                            <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border text-emerald-500 bg-emerald-500/10 border-emerald-500/20">
+                              ✓ Fully Certified — All 3 Phases
                             </span>
+                            <div className="flex flex-col items-start md:items-end gap-1">
+                              {p.txHash && (
+                                <a href={`https://testnet.algoexplorer.io/tx/${p.txHash}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-indigo-400 font-mono hover:text-indigo-300">
+                                  🔗 TX: {p.txHash.slice(0, 10)}...
+                                </a>
+                              )}
+                              {p.sbtAssetId && (
+                                <a href={`https://testnet.algoexplorer.io/asset/${p.sbtAssetId}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-400 font-mono hover:text-emerald-300">
+                                  🆔 SBT ID: {p.sbtAssetId}
+                                </a>
+                              )}
+                              {p.ipfsCid && (
+                                <a href={`https://ipfs.io/ipfs/${p.ipfsCid}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-amber-500 font-mono hover:text-amber-400">
+                                  📦 IPFS: {p.ipfsCid.slice(0, 10)}...
+                                </a>
+                              )}
+                            </div>
                             <p className="text-[10px] text-slate-600 font-mono">Signed by: {p.companyWallet?.slice(0,8)}...{p.companyWallet?.slice(-4)}</p>
                           </div>
                         </div>

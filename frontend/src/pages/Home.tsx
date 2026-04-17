@@ -21,15 +21,46 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
   const [companyId, setCompanyId] = useState("");
   const [companyIndustry, setCompanyIndustry] = useState("");
   
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Automatic reconnect Disabled intentionally for UX
-  }, []);
+  const [regPhase, setRegPhase] = useState(0); // 0: Form, 1: OTP
+  const [userOtp, setUserOtp] = useState("");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [regError, setRegError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const handleSendOTP = async () => {
+    if (!userEmail) return setRegError("Email is required for verification.");
+    setIsSendingOtp(true);
+    setRegError("");
+    try {
+      const res = await fetch('http://localhost:8000/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRegPhase(1);
+      } else {
+        setRegError(data.detail || "Failed to send OTP.");
+      }
+    } catch (err) {
+      setRegError("Server error. Check if backend is running.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
 
   const registerRole = async () => {
+    setRegError("");
     try {
-      let payload = { wallet: account, role: selectedRole, name: userName, email: userEmail, details: {} };
+      let payload: any = { 
+        wallet: account, 
+        role: selectedRole, 
+        name: userName, 
+        email: userEmail, 
+        otp: userOtp, 
+        details: {} 
+      };
       if (selectedRole === "student") {
         payload.details = {
           college: studentCollege,
@@ -54,14 +85,16 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
         body: JSON.stringify(payload)
       });
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
         localStorage.setItem('userRole', selectedRole);
         if (setUserRole) setUserRole(selectedRole);
         setShowRoleModal(false);
         navigate(`/${selectedRole}/dashboard`);
+      } else {
+        setRegError(data.detail || "Registration failed. Check OTP.");
       }
     } catch (e) {
-      console.log(e);
+      setRegError("Network error during registration.");
     }
   };
 
@@ -75,133 +108,93 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
             <h3 className="text-2xl font-bold text-white mb-2">Complete Profile</h3>
             <p className="text-slate-400 mb-6 font-semibold">Select your role to view your dashboard.</p>
             <div className="flex flex-col gap-4 mb-6">
-              <select
-                value={selectedRole}
-                onChange={e => setSelectedRole(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-              >
-                <option value="company">Company / Employer</option>
-                <option value="student">Student</option>
-                <option value="college">College</option>
-              </select>
-
-              {/* Student Fields */}
-              {selectedRole === "student" && (
+              {regPhase === 0 ? (
                 <>
+                  <select
+                    value={selectedRole}
+                    onChange={e => setSelectedRole(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
+                  >
+                    <option value="company">Company / Employer</option>
+                    <option value="student">Student</option>
+                    <option value="college">College</option>
+                  </select>
+
+                  {/* Shared Identity Fields */}
                   <input
                     type="text"
-                    placeholder="Full Name"
+                    placeholder="Official Name"
                     value={userName}
                     onChange={e => setUserName(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
                   />
                   <input
                     type="email"
-                    placeholder="Email Address"
+                    placeholder="Primary Email Address"
                     value={userEmail}
                     onChange={e => setUserEmail(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
                   />
-                  <input
-                    type="text"
-                    placeholder="College Name"
-                    value={studentCollege || ""}
-                    onChange={e => setStudentCollege(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Enrollment Number / Student ID"
-                    value={studentId || ""}
-                    onChange={e => setStudentId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Course / Program"
-                    value={studentCourse || ""}
-                    onChange={e => setStudentCourse(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Graduation Year (e.g. 2025)"
-                    value={studentYear || ""}
-                    onChange={e => setStudentYear(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
+
+                  {/* Role Specific Details (Simplified for brevity in Phase 0) */}
+                  {selectedRole === "student" && (
+                    <div className="grid grid-cols-2 gap-2">
+                       <input type="text" placeholder="College" value={studentCollege || ""} onChange={e => setStudentCollege(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                       <input type="text" placeholder="ID No" value={studentId || ""} onChange={e => setStudentId(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                       <input type="text" placeholder="Course" value={studentCourse || ""} onChange={e => setStudentCourse(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                       <input type="text" placeholder="Grad Year" value={studentYear || ""} onChange={e => setStudentYear(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                    </div>
+                  )}
+                  {selectedRole === "company" && (
+                     <div className="grid grid-cols-1 gap-2">
+                        <input type="text" placeholder="Industry" value={companyIndustry || ""} onChange={e => setCompanyIndustry(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                     </div>
+                  )}
+                  {selectedRole === "college" && (
+                     <div className="grid grid-cols-1 gap-2">
+                        <input type="text" placeholder="City/State" value={collegeCity || ""} onChange={e => setCollegeCity(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white" />
+                     </div>
+                  )}
+
+                  <button 
+                    onClick={handleSendOTP} 
+                    disabled={isSendingOtp}
+                    className="btn-primary w-full py-3 flex items-center justify-center gap-2"
+                  >
+                    {isSendingOtp ? 'Sending OTP...' : 'Verify Email & Continue'}
+                    {!isSendingOtp && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>}
+                  </button>
                 </>
+              ) : (
+                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-4 mb-4">
+                     <p className="text-xs text-indigo-300 font-bold mb-1 uppercase tracking-widest text-center">Verification Required</p>
+                     <p className="text-[10px] text-slate-500 text-center">We sent a 6-digit code to <span className="text-slate-300 font-bold">{userEmail}</span>. Enter it below to secure your identity.</p>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Enter 6-digit OTP"
+                    value={userOtp}
+                    onChange={e => setUserOtp(e.target.value)}
+                    className="w-full bg-slate-900 border border-indigo-500/50 rounded-xl p-4 text-center text-2xl font-black tracking-[0.5em] text-white focus:ring-4 ring-indigo-500/20 outline-none mb-4"
+                    maxLength={6}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => setRegPhase(0)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all">Back</button>
+                    <button onClick={registerRole} className="flex-[2] btn-primary py-3">Finish Registration</button>
+                  </div>
+                </div>
               )}
-
-              {/* College Fields */}
-              {selectedRole === "college" && (
-                <>
-                  <input
-                    type="text"
-                    placeholder="College Name"
-                    value={userName}
-                    onChange={e => setUserName(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Official Email Address"
-                    value={userEmail}
-                    onChange={e => setUserEmail(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Affiliation Code / College ID"
-                    value={collegeId || ""}
-                    onChange={e => setCollegeId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="City / State"
-                    value={collegeCity || ""}
-                    onChange={e => setCollegeCity(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                </>
-              )}
-
-              {/* Company Fields */}
-              {selectedRole === "company" && (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Company Name"
-                    value={userName}
-                    onChange={e => setUserName(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Official Email Address"
-                    value={userEmail}
-                    onChange={e => setUserEmail(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Organization Code / Company Registration Number"
-                    value={companyId || ""}
-                    onChange={e => setCompanyId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Industry (e.g. IT, Finance)"
-                    value={companyIndustry || ""}
-                    onChange={e => setCompanyIndustry(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white"
-                  />
-                </>
+              
+              {regError && (
+                <p className="text-xs text-red-400 font-bold bg-red-400/10 border border-red-400/20 p-3 rounded-xl animate-shake">
+                  {regError}
+                </p>
               )}
             </div>
-            <button onClick={registerRole} className="btn-primary w-full py-3">Continue to Dashboard</button>
+          </div>
+        </div>
+      )}
           </div>
         </div>
       )}
@@ -249,11 +242,20 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
                       type="text" 
                       placeholder="Search for a College or University to view verified truth..." 
                       className="bg-transparent border-none outline-none text-white w-full py-4 text-lg placeholder-slate-600"
-                      onKeyDown={(e) => { if (e.key === 'Enter') navigate('/leaderboard'); }}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => { 
+                        if (e.key === 'Enter' && searchQuery) {
+                           navigate(`/leaderboard?q=${encodeURIComponent(searchQuery)}`);
+                        } 
+                      }}
                     />
                 </div>
                 <button 
-                  onClick={() => navigate('/leaderboard')}
+                  onClick={() => {
+                    if (searchQuery) navigate(`/leaderboard?q=${encodeURIComponent(searchQuery)}`);
+                    else navigate('/leaderboard');
+                  }}
                   className="w-full md:w-auto bg-white text-slate-900 px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-slate-200 transition-all"
                 >
                   Search

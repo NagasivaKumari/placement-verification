@@ -51,6 +51,32 @@ const CollegeDashboard = ({ account, token }) => {
     }
   };
 
+  const [verifyingDegree, setVerifyingDegree] = useState(null); // student wallet
+  const [degreeForm, setDegreeForm] = useState({ name: '', year: new Date().getFullYear() });
+
+  const handleVerifyDegree = async (studentWallet) => {
+    try {
+      const res = await fetch('http://localhost:8000/api/college/verify-degree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ 
+            studentWallet, 
+            degreeName: degreeForm.name, 
+            graduationYear: parseInt(degreeForm.year) 
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVerifyingDegree(null);
+        fetchData();
+      } else {
+        alert(data.message || "Failed to certify degree.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading College Interface...</div>;
 
   return (
@@ -58,7 +84,7 @@ const CollegeDashboard = ({ account, token }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
         <div>
           <h1 className="text-4xl font-black text-white mb-2">Institutional Admin</h1>
-          <p className="text-slate-400">Verifying the identity of students to prevent institutional impersonation.</p>
+          <p className="text-slate-400">Verifying identity and certifying degrees to prevent credential fraud.</p>
         </div>
         <div className="flex gap-4">
            <div className="px-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center">
@@ -75,12 +101,12 @@ const CollegeDashboard = ({ account, token }) => {
           <p className="text-4xl font-black text-white">{stats.totalStudents}</p>
         </div>
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-          <h4 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-4">Identity Verified</h4>
-          <p className="text-4xl font-black text-white">{stats.verifiedStudents}</p>
+          <h4 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-4">Identity Sealed</h4>
+          <p className="text-4xl font-black text-emerald-400">{stats.verifiedStudents}</p>
         </div>
         <div className="bg-slate-900 border border-indigo-500/20 p-6 rounded-2xl">
-          <h4 className="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-4">Pending Approval</h4>
-          <p className="text-4xl font-black text-indigo-400">{stats.totalStudents - stats.verifiedStudents}</p>
+          <h4 className="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-4">Degrees Certified</h4>
+          <p className="text-4xl font-black text-indigo-400">{students.filter(s => s.details?.degreeVerified).length}</p>
         </div>
         <div className="bg-slate-900 border border-red-500/10 p-6 rounded-2xl outline outline-1 outline-red-500/5">
           <h4 className="text-red-500 font-bold text-xs uppercase tracking-widest mb-4">Fraud Flags</h4>
@@ -91,10 +117,10 @@ const CollegeDashboard = ({ account, token }) => {
       {/* Student List */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
         <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-          <h3 className="text-xl font-bold text-white">Student Enrollment Verification</h3>
+          <h3 className="text-xl font-bold text-white">Academic Credential Ledger</h3>
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
              <button className="px-4 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold">All Students</button>
-             <button className="px-4 py-1.5 text-slate-500 hover:text-slate-300 rounded-lg text-xs font-bold">Pending Only</button>
+             <button className="px-4 py-1.5 text-slate-500 hover:text-slate-300 rounded-lg text-xs font-bold">Pending Approval</button>
           </div>
         </div>
         <div className="p-0">
@@ -102,47 +128,86 @@ const CollegeDashboard = ({ account, token }) => {
             <thead>
               <tr className="bg-slate-950/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 border-b border-slate-800">
                 <th className="px-8 py-4">Identity & Wallet</th>
-                <th className="px-8 py-4">Academic Details</th>
-                <th className="px-8 py-4">Status</th>
-                <th className="px-8 py-4 text-right">Verification</th>
+                <th className="px-8 py-4">Academic Status</th>
+                <th className="px-8 py-4">Certification</th>
+                <th className="px-8 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {students.map((s, i) => (
-                <tr key={i} className="hover:bg-slate-800/20 transition-all">
+                <tr key={i} className={`hover:bg-slate-800/20 transition-all ${verifyingDegree === s.walletAddress ? 'bg-indigo-500/5' : ''}`}>
                   <td className="px-8 py-6">
-                    <div className="font-bold text-white mb-1">{s.name || "Anonymous User"}</div>
-                    <div className="text-xs font-mono text-slate-500 truncate w-40">{s.walletAddress}</div>
+                    <div className="font-bold text-white mb-1 uppercase tracking-tighter">{s.name || "Anonymous User"}</div>
+                    <div className="text-[10px] font-mono text-slate-600 truncate w-40">{s.walletAddress}</div>
                   </td>
                   <td className="px-8 py-6">
-                    <div className="text-sm text-slate-300">{s.details?.course || "Undeclared Course"}</div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase">ID: {s.details?.enrollmentId || "N/A"}</div>
+                    <div className="text-xs text-slate-300 font-bold">{s.details?.course || "Not Programmed"}</div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase mt-1">ID: {s.details?.enrollmentId || "N/A"}</div>
                   </td>
                   <td className="px-8 py-6">
-                    {s.details?.isVerifiedByCollege ? (
-                      <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded text-[10px] font-black uppercase border border-emerald-500/20">Official Student</span>
-                    ) : (
-                      <span className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-[10px] font-black uppercase border border-slate-700">Guest / Unverified</span>
-                    )}
+                     <div className="flex flex-col gap-1.5">
+                        {s.details?.isVerifiedByCollege ? (
+                          <span className="w-fit px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded text-[9px] font-black uppercase border border-indigo-500/20">Identity Sealed</span>
+                        ) : (
+                          <span className="w-fit px-2 py-0.5 bg-slate-800 text-slate-500 rounded text-[9px] font-black uppercase border border-slate-700">Unverified</span>
+                        )}
+                        {s.details?.degreeVerified && (
+                           <div className="flex flex-col">
+                              <span className="w-fit px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-black uppercase border border-emerald-500/20">Degree Certified</span>
+                              {s.details.degreeSbtId && <span className="text-[8px] font-mono text-slate-600 mt-1">ASA ID: {s.details.degreeSbtId}</span>}
+                           </div>
+                        )}
+                     </div>
                   </td>
                   <td className="px-8 py-6 text-right">
-                    {!s.details?.isVerifiedByCollege && (
-                      <button 
-                        onClick={() => handleVerifyStudent(s.walletAddress)}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all transform active:scale-95"
-                      >
-                        Confirm Enrollment
-                      </button>
-                    )}
-                    {s.details?.isVerifiedByCollege && (
-                      <div className="text-emerald-500 flex items-center justify-end gap-2 text-xs font-bold">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                        Identity Sealed
+                    {verifyingDegree === s.walletAddress ? (
+                       <div className="flex flex-col gap-2 animate-in slide-in-from-right-2">
+                          <input 
+                            type="text" 
+                            placeholder="Degree Name (e.g. B.Tech)" 
+                            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                            value={degreeForm.name}
+                            onChange={e => setDegreeForm(prev => ({...prev, name: e.target.value}))}
+                          />
+                          <input 
+                            type="number" 
+                            placeholder="Year" 
+                            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                            value={degreeForm.year}
+                            onChange={e => setDegreeForm(prev => ({...prev, year: e.target.value}))}
+                          />
+                          <div className="flex gap-2 justify-end">
+                             <button onClick={() => setVerifyingDegree(null)} className="text-[10px] text-slate-500 font-bold">Cancel</button>
+                             <button onClick={() => handleVerifyDegree(s.walletAddress)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase">Issue SBT</button>
+                          </div>
+                       </div>
+                    ) : (
+                      <div className="flex justify-end gap-2">
+                        {!s.details?.isVerifiedByCollege && (
+                          <button 
+                            onClick={() => handleVerifyStudent(s.walletAddress)}
+                            className="bg-white text-slate-900 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all transform active:scale-95"
+                          >
+                            Seal Identity
+                          </button>
+                        )}
+                        {s.details?.isVerifiedByCollege && !s.details?.degreeVerified && (
+                          <button 
+                            onClick={() => setVerifyingDegree(s.walletAddress)}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            Certify Degree
+                          </button>
+                        )}
+                        {s.details?.degreeVerified && (
+                           <span className="text-emerald-500 font-black text-[10px] uppercase tracking-widest">Verified 🏆</span>
+                        )}
                       </div>
                     )}
                   </td>
                 </tr>
               ))}
+
               {students.length === 0 && (
                 <tr>
                   <td colSpan="4" className="p-20 text-center text-slate-500">

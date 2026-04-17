@@ -26,40 +26,64 @@ const CompanyDashboard = ({ token, account }) => {
     }
   };
 
-  const [verifying, setVerifying] = useState(null); // tracks which code is being verified
+  const [verifying, setVerifying] = useState(null);
+  const [verifyMsg, setVerifyMsg] = useState({});
 
   const handleVerify = async (verificationCode) => {
     setVerifying(verificationCode);
+    setVerifyMsg(prev => ({ ...prev, [verificationCode]: '' }));
     try {
+      // Step 1: Tell backend to approve & get unsigned Algorand txn
       const res = await fetch('http://localhost:8000/api/placements/company-verify', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ verificationCode })
       });
       const data = await res.json();
       
-      if (data.success) {
-        // Status updated on backend — try Pera signing if available (non-blocking)
-        if (data.unsignedTxn && account) {
-          try {
-            const txnBytes = new Uint8Array(Buffer.from(data.unsignedTxn, 'base64'));
-            const txnGroup = [{ txn: algosdk.decodeUnsignedTransaction(txnBytes), signers: [account] }];
-            await peraWallet.signTransaction([txnGroup]);
-          } catch (sigErr) {
-            // Signing optional — status already updated in DB
-            console.warn("Pera signing skipped:", sigErr);
-          }
-        }
-        fetchPlacements(); // Always refresh
-      } else {
-        alert(data.detail || "Verification failed. Please try again.");
+      if (!data.success) {
+        setVerifyMsg(prev => ({ ...prev, [verificationCode]: data.detail || 'Verification failed.' }));
+        return;
       }
+
+      // Step 2: Sign with Pera Wallet (if txn was prepared)
+      if (data.unsignedTxn && account) {
+        try {
+          const txnBytes = new Uint8Array(Buffer.from(data.unsignedTxn, 'base64'));
+          const decodedTxn = algosdk.decodeUnsignedTransaction(txnBytes);
+          const txnGroup = [{ txn: decodedTxn, signers: [account.toUpperCase()] }];
+          
+          // Pera Wallet signs — user sees popup
+          const signedTxns = await peraWallet.signTransaction([txnGroup]);
+          
+          // Step 3: Submit signed txn to Algorand & get TX Hash
+          const submitRes = await fetch('http://localhost:8000/api/placements/submit-signed-txn', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+              verificationCode,
+              signedTxn: Buffer.from(signedTxns[0]).toString('base64')
+            })
+          });
+          const submitData = await submitRes.json();
+          if (submitData.txHash) {
+            setVerifyMsg(prev => ({ 
+              ...prev, 
+              [verificationCode]: `✅ Anchored on Algorand! TX: ${submitData.txHash.slice(0, 12)}... | View: ${submitData.explorerUrl}`
+            }));
+          }
+        } catch (sigErr) {
+          console.warn('Pera signing cancelled or failed:', sigErr);
+          setVerifyMsg(prev => ({ ...prev, [verificationCode]: '✅ Approved (wallet signing skipped)' }));
+        }
+      } else {
+        setVerifyMsg(prev => ({ ...prev, [verificationCode]: '✅ Claim approved successfully!' }));
+      }
+
+      fetchPlacements();
     } catch (err) {
-      console.error("Verification error:", err);
-      alert("Network error. Please check if the backend is running.");
+      console.error('Verification error:', err);
+      setVerifyMsg(prev => ({ ...prev, [verificationCode]: 'Network error. Is the backend running?' }));
     } finally {
       setVerifying(null);
     }
@@ -159,6 +183,9 @@ const CompanyDashboard = ({ token, account }) => {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
                             Signed
                          </div>
+                      )}
+                      {verifyMsg[p.verificationCode] && (
+                        <p className="text-[10px] text-emerald-400 font-bold mt-1 text-right">{verifyMsg[p.verificationCode]}</p>
                       )}
                     </td>
                   </tr>

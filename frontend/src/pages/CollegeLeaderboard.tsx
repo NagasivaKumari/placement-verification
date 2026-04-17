@@ -1,14 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 const CollegeLeaderboard = () => {
     const [stats, setStats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const location = useLocation();
 
     const API_URL = 'http://localhost:8000';
 
     useEffect(() => {
+        // Parse search query from URL
+        const params = new URLSearchParams(location.search);
+        const q = params.get('q');
+        if (q) setSearchQuery(q);
+
         const fetchStats = async () => {
             try {
                 const response = await fetch(`${API_URL}/api/colleges/stats`);
@@ -149,8 +156,9 @@ const CollegeLeaderboard = () => {
                   <div>
                      <h3 className="text-2xl font-black mb-2 italic">How is the "Trust Score" calculated?</h3>
                      <p className="text-slate-400 text-sm leading-relaxed">
-                        We calculate the ratio between **On-Chain Placement Offers** and **Final Employer Payroll Verification**. 
-                        Colleges with a score below 50% are flagged for "High Verification Gap," meaning many of their claimed offers never turned into real jobs.
+                        We calculate the <strong>Outcome Ratio</strong>: (<code>Phase 3 Certified Placements</code> ÷ <code>Total Student Claims</code>) × 100. 
+                        <br/><br/>
+                        A score of 100% means every offer claimed by students has been cryptographically signed by an employer and recorded as a finalized payroll event on the Algorand blockchain. Institutions with a score below 40% are flagged for a "High Verification Gap."
                      </p>
                   </div>
                </div>

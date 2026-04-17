@@ -70,32 +70,35 @@ const StudentDashboard = ({ token, account }) => {
         })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setUploadMessage("Offer successfully uploaded and tagged to company!");
         setOfferRole("");
         setOfferSalary("");
         fetchPlacements();
         setTimeout(() => setUploadMessage(""), 5000);
+      } else {
+        setUploadMessage(data.detail || data.message || "Failed to upload offer.");
       }
     } catch (err) {
-      setUploadMessage("Failed to upload offer.");
+      setUploadMessage("Failed to upload offer. Check connection.");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const verifyPhase = async (phase, code) => {
+  const verifyPhase = async (phase, code, placementTxHash = '') => {
     try {
       let endpoint = '';
-      let body = { verificationCode: code };
+      let body: any = { verificationCode: code };
       
       if (phase === 'join') {
         endpoint = '/api/placements/student-join';
         body.location = 'Office - HQ'; 
       } else if (phase === 'salary') {
         endpoint = '/api/placements/verify-salary';
-        body.amount = parseFloat(salaryAmount);
-        body.salaryTxHash = salaryHash;
+        body.amount = parseFloat(salaryAmount) || 0;
+        // Use auto-filled txHash from placement record, fallback to manual entry
+        body.salaryTxHash = placementTxHash || salaryHash || 'pending';
       }
 
       const res = await fetch(`http://localhost:8000${endpoint}`, {
@@ -106,8 +109,8 @@ const StudentDashboard = ({ token, account }) => {
       const data = await res.json();
       if (data.success) {
         setActiveVerification(null);
-        setSalaryAmount("");
-        setSalaryHash("");
+        setSalaryAmount('');
+        setSalaryHash('');
         fetchPlacements();
       }
     } catch (err) {
@@ -240,7 +243,7 @@ const StudentDashboard = ({ token, account }) => {
                                 <div>
                                    <div className="flex items-center gap-3 mb-2">
                                       <h4 className="text-2xl font-black text-white">{p.role}</h4>
-                                      <span className="font-mono text-emerald-400 text-sm font-bold bg-emerald-400/10 px-3 py-1 rounded-xl border border-emerald-500/20">${p.salary.toLocaleString()}</span>
+                                      <span className="font-mono text-emerald-400 text-sm font-bold bg-emerald-400/10 px-3 py-1 rounded-xl border border-emerald-500/20">₹{parseInt(p.salary).toLocaleString()}</span>
                                    </div>
                                    <div className="flex items-center gap-4">
                                       <p className="text-slate-400 text-sm font-semibold italic">{p.companyName}</p>
@@ -269,13 +272,17 @@ const StudentDashboard = ({ token, account }) => {
                                           className="w-full bg-white text-slate-900 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Phase 2: Verify Joining</button>
                                       )}
                                       {p.status === 'joining_verified' && (
-                                        <div className="flex flex-col gap-2">
-                                           <div className="flex gap-2">
-                                              <input type="number" placeholder="Actual Salary" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-                                              <input type="text" placeholder="TX Hash" value={salaryHash} onChange={e => setSalaryHash(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-                                           </div>
-                                           <button onClick={() => verifyPhase('salary', p.verificationCode)} 
-                                             className="w-full bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20">Phase 3: Verify Salary</button>
+                                         <div className="flex flex-col gap-2">
+                                            <div className="bg-slate-950 border border-emerald-500/20 rounded-xl px-3 py-2">
+                                               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Algorand TX Hash (auto-filled)</p>
+                                               <p className="text-emerald-400 font-mono text-[10px] break-all">{p.txHash || 'Waiting for company to sign...'}</p>
+                                            </div>
+                                            <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
+                                               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">First Month Salary (₹)</p>
+                                               <input type="number" placeholder="e.g. 100000" value={salaryAmount || p.salary} onChange={e => setSalaryAmount(e.target.value)} className="w-full bg-transparent text-white text-xs outline-none" />
+                                            </div>
+                                           <button onClick={() => verifyPhase('salary', p.verificationCode, p.txHash)} 
+                                             className="w-full bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20">Phase 3: Complete Certification</button>
                                         </div>
                                       )}
                                       {p.status === 'salary_verified' && (
