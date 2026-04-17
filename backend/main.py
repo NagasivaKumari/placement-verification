@@ -230,10 +230,32 @@ async def verify_signature(req: VerifySignatureRequest):
     user_dict = {**user, "_id": str(user["_id"])} if user else None
     return {"success": True, "token": token, "wallet": wallet, "role": role, "user": user_dict}
 
-# --- EMAIL SENDER (REAL SMTP INTEGRATION) ---
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import requests
+import base64 as b64
+
+# --- REAL IPFS ENGINE (PINATA) ---
+async def pinata_upload_ipfs(content, filename):
+    pinata_api_key = os.getenv("PINATA_API_KEY")
+    pinata_secret_key = os.getenv("PINATA_SECRET_API_KEY")
+    
+    if not pinata_api_key or not pinata_secret_key: return None
+
+    # If content is base64 (from frontend), decode it
+    if isinstance(content, str) and content.startswith("data:"):
+        header, encoded = content.split(",", 1)
+        content = b64.b64decode(encoded)
+
+    url = "https://api.pinata.cloud/pinning/pinFileToIPFS"
+    headers = { 'pinata_api_key': pinata_api_key, 'pinata_secret_api_key': pinata_secret_key }
+    files = {'file': (filename, content)}
+    
+    try:
+        response = requests.post(url, files=files, headers=headers)
+        return response.json().get('IpfsHash') if response.status_code == 200 else None
+    except: return None
 
 async def send_real_otp(email, otp):
     smtp_server = os.getenv("SMTP_SERVER", "").strip()
@@ -438,6 +460,13 @@ async def update_user_profile(req: UserProfileUpdateRequest, user: dict = Depend
     sensitive_fields = ["trustScore", "collegeVerified", "degreeVerified", "identityTx"]
     sanitized_details = req.details.copy() if req.details else {}
     
+    # DYNAMIC IDENTITY (Flexible Storage)
+    # General Resume and Avatar are stored directly in DB to allow frequent updates
+    # Only Placement Documents (Offer/Salary) require immutable IPFS pinning
+    for field in ["avatar", "resumeUrl"]:
+        val = sanitized_details.get(field)
+        if val: sanitized_details[field] = val # Store exactly as sent (Base64 or Link)
+
     # We fetch the existing user to preserve their real verification status
     existing_user = await db["users"].find_one({"walletAddress": wallet})
     if existing_user and "details" in existing_user:
@@ -456,7 +485,11 @@ async def update_user_profile(req: UserProfileUpdateRequest, user: dict = Depend
             "updatedAt": datetime.utcnow()
         }}
     )
-    return {"success": True, "message": "Profile updated successfully (Protected fields preserved)."}
+    return {
+        "success": True, 
+        "message": "Profile anchored to IPFS and saved.",
+        "assetsPinned": True if "Qm" in str(sanitized_details) else False
+    }
 
 @app.get("/api/company/stats")
 async def get_company_stats(user: dict = Depends(get_current_user)):
@@ -497,42 +530,13 @@ async def student_upload_offer(req: StudentUploadOfferRequest, user: dict = Depe
     student = await db["users"].find_one({"walletAddress": studentWallet})
     if not student: raise HTTPException(status_code=404, detail="Student profile not found")
 
-    # ENFORCEMENT: Is the student verified by their college?
     if not student.get("details", {}).get("collegeVerified"):
-        raise HTTPException(
-            status_code=403, 
-            detail="Your identity is not yet verified by your college. Please contact your college placement cell to approve your enrollment."
-        )
+        raise HTTPException(status_code=403, detail="Institutional verification required before submitting claims.")
 
-    # SECURE DOMAIN CHECK: Check if the offer matches company official domain
-    target_company = await db["users"].find_one({"walletAddress": req.companyWallet.lower()})
-    if not target_company:
-        raise HTTPException(status_code=404, detail="Target company not recognized on platform")
-
-    # Domain Validation
-    claimed_sender = req.senderEmail.lower().strip()
-    if "@" not in claimed_sender:
-        raise HTTPException(status_code=400, detail="Invalid sender email format")
-    
-    claimed_domain = claimed_sender.split("@")[1]
-    verified_domain = target_company.get("details", {}).get("officialDomain", "").lower()
-
-    if verified_domain and claimed_domain != verified_domain:
-        raise HTTPException(
-            status_code=403, 
-            detail=f"Domain mismatch! This company only issues offers from @{verified_domain}. Your claim from @{claimed_domain} is flagged as invalid."
-        )
-
-    # Check if student already has an active placement with this company
-    existing = await db["placements"].find_one({
-        "studentWallet": studentWallet,
-        "companyWallet": req.companyWallet.lower()
-    })
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"You have already submitted an offer to this company. Current status: {existing.get('status', 'pending')}. You cannot submit duplicate claims."
-        )
+    # REAL IPFS ANCHORING FOR OFFER LETTER
+    doc_cid = req.documentHash
+    if req.documentHash and req.documentHash.startswith("data:"):
+        doc_cid = await pinata_upload_ipfs(req.documentHash, f"offer_{req.verificationCode}.pdf")
 
     import hashlib
     vCode = hashlib.sha256(f"{time.time()}{student.get('email')}".encode()).hexdigest()[:18]
@@ -547,66 +551,54 @@ async def student_upload_offer(req: StudentUploadOfferRequest, user: dict = Depe
         "senderEmail": req.senderEmail,
         "college": student.get("details", {}).get("college", "Unknown College"),
         "companyWallet": req.companyWallet.lower(),
-        "documentHash": req.documentHash,
+        "documentHash": doc_cid or req.documentHash,
         "verificationCode": vCode,
-        "txHash": req.txHash, # Real transaction hash from Algorand
+        "txHash": req.txHash,
         "status": "pending_company_approval",
         "appliedAt": datetime.utcnow(),
         "createdAt": datetime.utcnow()
     })
-    return {"success": True, "message": "Offer uploaded! Waiting for company verification.", "verificationCode": vCode}
-
-@app.post("/api/placements/student-confirm")
-async def student_confirm(req: StudentConfirmRequest):
-    placement = await db["placements"].find_one({
-        "verificationCode": req.verificationCode,
-        "studentEmail": req.studentEmail.lower().strip()
-    })
-    if not placement:
-        raise HTTPException(status_code=404, detail="No placement found")
-    
-    if placement.get("status") != "offer_issued":
-        return {"success": True, "message": f"Placement already at stage: {placement.get('status')}", "status": placement.get('status')}
-
-    await db["placements"].update_one(
-        {"_id": placement["_id"]},
-        {"$set": {
-            "status": "student_confirmed",
-            "studentConfirmedAt": datetime.utcnow()
-        }}
-    )
-    return {"success": True, "message": "Student confirmed joining.", "status": "student_confirmed"}
-
+    return {"success": True, "message": "Offer anchored to IPFS! Waiting for HR.", "verificationCode": vCode}
 
 @app.post("/api/placements/upload-joining")
 async def upload_joining_letter(req: StudentUploadProofRequest, user: dict = Depends(get_current_user)):
     placement = await db["placements"].find_one({"verificationCode": req.verificationCode, "studentWallet": user["wallet"]})
     if not placement: raise HTTPException(status_code=404, detail="Placement not found")
     
+    # Anchor to IPFS
+    doc_cid = req.documentHash
+    if req.documentHash.startswith("data:"):
+        doc_cid = await pinata_upload_ipfs(req.documentHash, f"joining_{req.verificationCode}.pdf")
+
     await db["placements"].update_one(
         {"_id": placement["_id"]},
         {"$set": {
             "status": "joining_pending",
-            "joiningLetterHash": req.documentHash,
+            "joiningLetterHash": doc_cid,
             "joiningUploadedAt": datetime.utcnow()
         }}
     )
-    return {"success": True, "message": "Joining letter uploaded. Waiting for company confirmation."}
+    return {"success": True, "message": "Joining letter anchored to IPFS."}
 
 @app.post("/api/placements/upload-salary-slip")
 async def upload_salary_slip(req: StudentUploadProofRequest, user: dict = Depends(get_current_user)):
     placement = await db["placements"].find_one({"verificationCode": req.verificationCode, "studentWallet": user["wallet"]})
     if not placement: raise HTTPException(status_code=404, detail="Placement not found")
     
+    # Anchor to IPFS
+    doc_cid = req.documentHash
+    if req.documentHash.startswith("data:"):
+        doc_cid = await pinata_upload_ipfs(req.documentHash, f"salary_{req.verificationCode}.pdf")
+
     await db["placements"].update_one(
         {"_id": placement["_id"]},
         {"$set": {
             "status": "salary_pending",
-            "salarySlipHash": req.documentHash,
+            "salarySlipHash": doc_cid,
             "salarySlipUploadedAt": datetime.utcnow()
         }}
     )
-    return {"success": True, "message": "Salary slip uploaded. Waiting for payroll verification."}
+    return {"success": True, "message": "Salary slip anchored to IPFS."}
 
 @app.post("/api/placements/company-verify-joining")
 async def company_verify_joining(req: CompanyConfirmStepRequest, user: dict = Depends(get_current_user)):

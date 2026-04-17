@@ -63,24 +63,27 @@ const StudentDashboard = ({ token, account }) => {
   const handleUploadOffer = async (e) => {
     e.preventDefault();
     if (!offerCompany) { setUploadMessage("Select target employer."); return; }
+    if (!selectedFile) { setUploadMessage("Please select your offer letter."); return; }
     setIsUploading(true);
     setUploadMessage("");
     
     try {
+      // Convert file to base64 for IPFS anchoring
+      const reader = new FileReader();
+      const fileData = await new Promise((resolve) => {
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(selectedFile);
+      });
+
       // 1. REAL BLOCKCHAIN TRANSACTION (ANCHOR THE CLAIM)
       let claimTxId = null;
       try {
         claimTxId = await signAndSendPlacementClaim(
-          account, 
-          offerCompany, 
-          offerRole, 
-          offerSalary
+          account, offerCompany, offerRole, offerSalary
         );
-        console.log("Placement claim anchored:", claimTxId);
       } catch (txnError) {
         setUploadMessage("Transaction rejected. Claim not published.");
-        setIsUploading(false);
-        return;
+        setIsUploading(false); return;
       }
 
       // 2. SEND METADATA TO BACKEND
@@ -93,34 +96,53 @@ const StudentDashboard = ({ token, account }) => {
           salary: parseFloat(offerSalary) || 0,
           placementType: placementType,
           senderEmail: offerSenderEmail,
-          documentHash: "ipfs_offchain_" + Date.now().toString(16),
-          txHash: claimTxId // Save the real TxID
+          documentHash: fileData, // Real file data for IPFS
+          txHash: claimTxId 
         })
       });
       
       if (res.ok) {
-        setUploadMessage("Success! Claim anchored with TxID: " + claimTxId.slice(0, 8) + "...");
+        setUploadMessage("Success! Offer anchored with CID and TxID.");
         setOfferRole(""); setOfferSalary(""); setSelectedFile(null);
         fetchPlacements();
       }
     } catch (err) { 
       setUploadMessage("Network failure during anchoring."); 
-    } finally { 
-      setIsUploading(false); 
-    }
+    } finally { setIsUploading(false); }
   };
 
   const verifyPhase = async (phase, code) => {
     try {
       let endpoint = '';
       let body: any = { verificationCode: code };
-      if (phase === 'join-upload') endpoint = '/api/placements/upload-joining';
-      else if (phase === 'salary-upload') endpoint = '/api/placements/upload-salary-slip';
-      else if (phase === 'salary-match') {
+      
+      if (phase === 'join-upload' || phase === 'salary-upload') {
+        // Trigger file picker
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = async (e: any) => {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = async () => {
+             endpoint = phase === 'join-upload' ? '/api/placements/upload-joining' : '/api/placements/upload-salary-slip';
+             body.documentHash = reader.result;
+             const res = await fetch(`${API_URL}${endpoint}`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+               body: JSON.stringify(body)
+             });
+             if (res.ok) fetchPlacements();
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+        return;
+      } else if (phase === 'salary-match') {
         endpoint = '/api/placements/verify-salary';
         body.amount = parseFloat(salaryAmount) || 0;
       }
-      const res = await fetch(`http://localhost:8000${endpoint}`, {
+      
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(body)
@@ -155,12 +177,12 @@ const StudentDashboard = ({ token, account }) => {
                         <button 
                           onClick={() => {
                             const url = profile.details.resumeUrl;
-                            if (url.startsWith('http')) {
+                            if (url.startsWith('http') || url.startsWith('data:')) {
                               window.open(url, '_blank');
                             } else if (url.startsWith('Qm') || url.startsWith('ba')) {
                               window.open(`https://ipfs.io/ipfs/${url}`, '_blank');
                             } else {
-                              alert(`" ${url} " is a local record. In a production environment, this file would be anchored to IPFS to provide a permanent CID.`);
+                              alert(`" ${url} " is a local record with no viewable data. Please re-upload your file.`);
                             }
                           }}
                           className="text-[10px] text-slate-400 font-black uppercase tracking-widest hover:text-white transition-all flex items-center gap-2 group"

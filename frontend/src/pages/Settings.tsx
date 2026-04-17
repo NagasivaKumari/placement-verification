@@ -45,9 +45,12 @@ const Settings = ({ token, account, userRole }) => {
         };
         reader.readAsDataURL(file);
       } else if (type === 'resume') {
-        // Fallback for resume filename
-        handleDetail('resumeUrl', file.name);
-        setMessage(`"${file.name}" ready for synchronization.`);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          handleDetail('resumeUrl', reader.result);
+          setMessage(`"${file.name}" ready for synchronization.`);
+        };
+        reader.readAsDataURL(file);
       }
     }
   };
@@ -186,16 +189,16 @@ const Settings = ({ token, account, userRole }) => {
                                    
                                    {profile.details.resumeUrl && (
                                      <button 
-                                       onClick={() => {
-                                         const url = profile.details.resumeUrl;
-                                         if (url.startsWith('http')) {
-                                           window.open(url, '_blank');
-                                         } else if (url.startsWith('Qm') || url.startsWith('ba')) {
-                                           window.open(`https://ipfs.io/ipfs/${url}`, '_blank');
-                                         } else {
-                                           alert(`" ${url} " is a local record. In a production environment, this file would be anchored to IPFS to provide a permanent CID.`);
-                                         }
-                                       }}
+                                         onClick={() => {
+                                           const url = profile.details.resumeUrl;
+                                           if (url.startsWith('http') || url.startsWith('data:')) {
+                                             window.open(url, '_blank');
+                                           } else if (url.startsWith('Qm') || url.startsWith('ba')) {
+                                             window.open(`https://ipfs.io/ipfs/${url}`, '_blank');
+                                           } else {
+                                             alert(`" ${url} " is a local record with no viewable data. Please re-upload your file.`);
+                                           }
+                                         }}
                                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
                                      >
                                        View
