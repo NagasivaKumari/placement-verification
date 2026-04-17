@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { API_URL } from '../config';
 
 const CollegeLeaderboard = () => {
     const [stats, setStats] = useState([]);
@@ -7,8 +8,6 @@ const CollegeLeaderboard = () => {
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const location = useLocation();
-
-    const API_URL = 'http://localhost:8000';
 
     useEffect(() => {
         // Parse search query from URL
@@ -18,7 +17,7 @@ const CollegeLeaderboard = () => {
 
         const fetchStats = async () => {
             try {
-                const response = await fetch(`${API_URL}/api/colleges/stats`);
+                const response = await fetch(`${API_URL}/api/leaderboard/colleges`);
                 const data = await response.json();
                 if (data.success) {
                     setStats(data.stats);

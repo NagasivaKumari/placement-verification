@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_URL } from '../config';
 import TalentPassport from '../components/TalentPassport';
 
 const statusLabel = (status) => {
@@ -24,8 +25,6 @@ const VerifyPlacement = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const API_URL = 'http://localhost:8000';
 
   const handleCollegeSearch = async (e) => {
     e.preventDefault();

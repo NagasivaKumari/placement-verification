@@ -12,6 +12,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import CollegeDashboard from './pages/CollegeDashboard';
 import Settings from './pages/Settings';
 import { peraWallet } from './wallet';
+import { API_URL } from './config';
 import './App.css';
 
 function App() {
@@ -70,7 +71,7 @@ function App() {
     setAccount(accountAddress);
     // Call backend to authenticate
     try {
-      const response = await fetch('http://localhost:8000/api/auth/verify-signature', {
+      const response = await fetch(`${API_URL}/api/auth/verify-signature`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ wallet: accountAddress, signature: 'pera-signature-placeholder' })

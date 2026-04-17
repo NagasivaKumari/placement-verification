@@ -5,6 +5,8 @@ import { PeraWalletConnect } from '@perawallet/connect';
 import { peraWallet } from '../wallet';
 import { signAndSendRegistration } from '../utils/algorand';
 
+import { API_URL } from '../config';
+
 const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWallet, showRoleModal, setShowRoleModal }) => {
   const [walletError, setWalletError] = useState("");
   const [selectedRole, setSelectedRole] = useState("company");
@@ -44,7 +46,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
     setIsSendingOtp(true);
     setRegError("");
     try {
-      const res = await fetch('http://localhost:8000/api/auth/send-otp', {
+      const response = await fetch(`${API_URL}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: userEmail })
@@ -122,7 +124,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
         };
       }
       
-      const response = await fetch('http://localhost:8000/api/auth/register-role', {
+      const response = await fetch(`${API_URL}/api/auth/register-role`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

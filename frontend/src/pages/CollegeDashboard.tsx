@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../config';
 
 const CollegeDashboard = ({ account, token }) => {
   const [students, setStudents] = useState([]);
@@ -34,7 +35,7 @@ const CollegeDashboard = ({ account, token }) => {
 
   const handleVerifyStudent = async (studentWallet) => {
     try {
-      const res = await fetch('http://localhost:8000/api/college/verify-student', {
+      const res = await fetch(`${API_URL}/api/college/verify-student`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

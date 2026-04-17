@@ -25,9 +25,12 @@ APP_ID = int(os.getenv("ALGORAND_APP_ID", "123456")) # Mock for now
 
 algod_client = AlgodClient(ALGOD_TOKEN, ALGOD_SERVER)
 
+# ============ CORS Configuration ============
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

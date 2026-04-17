@@ -1,38 +1,26 @@
-# Multi-stage build for Node.js backend
-FROM node:18-alpine AS builder
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install production dependencies only
-RUN npm install --only=production
+# Copy requirements
+COPY requirements.txt .
 
-# Stage 2: Runtime
-FROM node:18-alpine
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-WORKDIR /app
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Copy from builder
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules /app/node_modules
-
-# Copy application code
-COPY --chown=nodejs:nodejs . .
-
-# Switch to non-root user
-USER nodejs
+# Copy application
+COPY . .
 
 # Expose port
-EXPOSE 3000
+EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+# Set dynamic port via environment variable (for Render)
+ENV PORT 8000
 
-# Start server
-CMD ["node", "server.js"]
+# Start application
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT

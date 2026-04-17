@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../config';
 
 import { signAndSendPlacementClaim } from '../utils/algorand';
 
@@ -29,7 +30,7 @@ const StudentDashboard = ({ token, account }) => {
 
   const fetchProfile = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/user/profile', {
+      const res = await fetch(`${API_URL}/api/user/profile`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -39,7 +40,7 @@ const StudentDashboard = ({ token, account }) => {
 
   const fetchPlacements = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/student/placements', {
+      const res = await fetch(`${API_URL}/api/student/placements`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -53,7 +54,7 @@ const StudentDashboard = ({ token, account }) => {
 
   const fetchCompanies = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/companies/active');
+      const res = await fetch(`${API_URL}/api/companies/active`);
       const data = await res.json();
       if (data.companies) setCompanies(data.companies);
     } catch (e) { console.error(e); }
@@ -83,7 +84,7 @@ const StudentDashboard = ({ token, account }) => {
       }
 
       // 2. SEND METADATA TO BACKEND
-      const res = await fetch('http://localhost:8000/api/placements/student-upload', {
+      const res = await fetch(`${API_URL}/api/placements/student-upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({

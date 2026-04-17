@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../config';
 import { peraWallet } from '../wallet';
 import algosdk from 'algosdk';
 
@@ -37,7 +38,7 @@ const CompanyDashboard = ({ token, account }) => {
 
   const fetchPlacements = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/company/placements', {
+      const res = await fetch(`${API_URL}/api/company/placements`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -63,7 +64,7 @@ const CompanyDashboard = ({ token, account }) => {
       if (step === 'joining') endpoint = '/api/placements/company-verify-joining';
       if (step === 'payroll') endpoint = '/api/placements/verify-salary';
 
-      const res = await fetch(`http://localhost:8000${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(body)
@@ -87,7 +88,7 @@ const CompanyDashboard = ({ token, account }) => {
     setVerifyMsg(prev => ({ ...prev, [verificationCode]: '' }));
     try {
       // Step 1: Tell backend to approve & get unsigned Algorand txn
-      const res = await fetch('http://localhost:8000/api/placements/company-verify', {
+      const res = await fetch(`${API_URL}/api/placements/company-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ verificationCode })

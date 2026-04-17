@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../config';
 
 const Settings = ({ token, account, userRole }) => {
   const [profile, setProfile] = useState({ name: "", email: "", details: {}, trustScore: 0, identityTx: "" });
@@ -17,7 +18,7 @@ const Settings = ({ token, account, userRole }) => {
     }
     const fetchProfile = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/user/profile', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${API_URL}/api/user/profile`, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         if (data.walletAddress) {
           setProfile({ 
@@ -49,7 +50,7 @@ const Settings = ({ token, account, userRole }) => {
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch('http://localhost:8000/api/user/profile', {
+      const res = await fetch(`${API_URL}/api/user/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(profile)
