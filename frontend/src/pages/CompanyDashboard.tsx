@@ -299,6 +299,7 @@ const CompanyDashboard = ({ token, account }) => {
             </tbody>
           </table>
         </div>
+        </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex flex-wrap gap-4 mb-8 bg-slate-900/50 p-6 rounded-3xl border border-slate-800">

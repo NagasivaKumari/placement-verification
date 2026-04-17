@@ -148,6 +148,10 @@ class StudentUploadProofRequest(BaseModel):
     documentHash: str
     notes: Optional[str] = ""
 
+class StudentJoinVerifyRequest(BaseModel):
+    verificationCode: str
+    location: str
+
 class CompanyConfirmStepRequest(BaseModel):
     verificationCode: str
     confirm: bool = True

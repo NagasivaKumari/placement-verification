@@ -244,7 +244,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
                     placeholder="Enter 6-digit OTP"
                     value={userOtp}
                     onChange={e => setUserOtp(e.target.value)}
-                    className="w-full bg-slate-900 border border-indigo-500/50 rounded-xl p-4 text-center text-2xl font-black tracking-[0.5em] text-white focus:ring-4 ring-indigo-500/20 outline-none mb-4"
+                    className="w-full bg-slate-900 border border-indigo-500/50 rounded-xl p-4 text-center text-2xl font-black tracking-[0.5em] placeholder:tracking-normal placeholder:font-medium text-white focus:ring-4 ring-indigo-500/20 outline-none mb-4"
                     maxLength={6}
                   />
                   <div className="flex gap-2">
