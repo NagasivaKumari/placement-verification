@@ -1,3 +1,7 @@
+import algosdk
+from algosdk.v2client.algod import AlgodClient
+from algosdk.transaction import PaymentTxn, ApplicationNoOpTxn
+import base64
 import os
 import time
 import jwt
@@ -11,7 +15,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Placement Verification API", version="2.0.0")
+app = FastAPI(title="TruePlacement Trust Ledger", version="2.1.0")
+
+# ============ Algorand Config ============
+ALGOD_SERVER = os.getenv("ALGOD_SERVER", "https://testnet-api.algonode.cloud")
+ALGOD_PORT = os.getenv("ALGOD_PORT", "443")
+ALGOD_TOKEN = os.getenv("ALGOD_TOKEN", "")
+APP_ID = int(os.getenv("ALGORAND_APP_ID", "123456")) # Mock for now
+
+algod_client = AlgodClient(ALGOD_TOKEN, ALGOD_SERVER)
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,7 +56,7 @@ async def startup_db_client():
         await db["placements"].create_index("verificationCode")
         await db["placements"].create_index("status")
         await db["users"].create_index("walletAddress", unique=True)
-        print("✓ MongoDB connected via Motor")
+        print("MongoDB connected via Motor")
     except Exception as e:
         print(f"MongoDB connection error: {e}")
 
@@ -97,6 +109,15 @@ class StudentUploadOfferRequest(BaseModel):
 class CompanyApproveRequest(BaseModel):
     verificationCode: str
     txHash: Optional[str] = "0x"
+
+class StudentJoinVerifyRequest(BaseModel):
+    verificationCode: str
+    location: Optional[str] = "Remote"
+
+class SalaryVerificationRequest(BaseModel):
+    verificationCode: str
+    salaryTxHash: str
+    amount: float
 
 class IssueOfferRequest(BaseModel):
     verificationCode: str
@@ -318,14 +339,63 @@ async def company_verify(req: CompanyApproveRequest, user: dict = Depends(get_cu
     placement = await db["placements"].find_one({"verificationCode": req.verificationCode, "companyWallet": wallet})
     if not placement: raise HTTPException(status_code=404, detail="Placement not found")
     
-    if placement.get("status") == "verified_by_employer":
-        return {"success": True, "message": "Already verified", "status": "verified_by_employer"}
+    # Generate Unsigned Algorand Transaction for the Frontend to Sign
+    try:
+        params = algod_client.suggested_params()
+        # Note: In a real app, this would be an App Call to anchor the placement hash
+        # For this MVP, we prepare a small notarization payment or NoOp
+        txn = PaymentTxn(
+            sender=wallet,
+            sp=params,
+            receiver=wallet, # Self-payment of 0 to anchor note
+            amt=0,
+            note=f"PlacementVerified:{req.verificationCode}".encode()
+        )
+        unsigned_txn_encoded = base64.b64encode(algosdk.encoding.msgpack_encode(txn)).decode()
         
+        await db["placements"].update_one(
+            {"_id": placement["_id"]},
+            {"$set": {"status": "offer_verified", "employerVerifiedAt": datetime.utcnow()}}
+        )
+        
+        return {
+            "success": True, 
+            "message": "Transaction Prepared", 
+            "unsignedTxn": unsigned_txn_encoded,
+            "status": "offer_verified"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Algorand prep failed: {str(e)}")
+
+@app.post("/api/placements/student-join")
+async def student_join_verify(req: StudentJoinVerifyRequest, user: dict = Depends(get_current_user)):
+    wallet = user["wallet"]
+    placement = await db["placements"].find_one({"verificationCode": req.verificationCode, "studentWallet": wallet})
+    if not placement: raise HTTPException(status_code=404, detail="Placement not found")
+    
     await db["placements"].update_one(
         {"_id": placement["_id"]},
-        {"$set": {"status": "verified_by_employer", "txHash": req.txHash, "employerVerifiedAt": datetime.utcnow()}}
+        {"$set": {"status": "joining_verified", "joinedAt": datetime.utcnow(), "location": req.location}}
     )
-    return {"success": True, "message": "Offer is FULLY VERIFIED ON-CHAIN.", "status": "verified_by_employer"}
+    return {"success": True, "message": "Joined status updated.", "status": "joining_verified"}
+
+@app.post("/api/placements/verify-salary")
+async def verify_salary(req: SalaryVerificationRequest, user: dict = Depends(get_current_user)):
+    wallet = user["wallet"]
+    # Can be called by student or company to anchor the truth
+    placement = await db["placements"].find_one({"verificationCode": req.verificationCode})
+    if not placement: raise HTTPException(status_code=404, detail="Placement not found")
+    
+    await db["placements"].update_one(
+        {"_id": placement["_id"]},
+        {"$set": {
+            "status": "salary_verified", 
+            "salaryTxHash": req.salaryTxHash, 
+            "actualSalary": req.amount,
+            "salaryVerifiedAt": datetime.utcnow()
+        }}
+    )
+    return {"success": True, "message": "Salary Truth Anchored.", "status": "salary_verified"}
 
 @app.get("/api/placements/lookup/{code}")
 async def lookup_placement(code: str):

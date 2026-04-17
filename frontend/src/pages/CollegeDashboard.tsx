@@ -1,135 +1,160 @@
 import React, { useState, useEffect } from 'react';
 
 const CollegeDashboard = ({ account, token }) => {
-  const [stats, setStats] = useState(null);
   const [students, setStudents] = useState([]);
+  const [stats, setStats] = useState({ totalStudents: 0, verifiedStudents: 0, placementTruthRate: 0, flags: 0 });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [anomalyFlag, setAnomalyFlag] = useState(false);
-
-  const API_URL = 'http://localhost:8000';
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const statsResponse = await fetch(`${API_URL}/api/colleges/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const statsData = await statsResponse.json();
-        if (statsData.success) {
-          const myStats = statsData.stats.length > 0 ? statsData.stats[0] : { totalOffers: 0, averageSalary: 0, fullyVerified: 0, isAnomaly: false };
-          setStats({
-              placementRate: myStats.totalOffers * 10,
-              averageSalary: myStats.averageSalary || 0,
-              verifiedPlacements: myStats.fullyVerified,
-              studentSatisfaction: 95,
-              fraudAttempts: myStats.isAnomaly ? 10 : 0
-          });
-          setAnomalyFlag(myStats.isAnomaly);
-        }
-
-        const studentResponse = await fetch(`${API_URL}/api/college/students`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const studentData = await studentResponse.json();
-        if(studentData.success) {
-            setStudents(studentData.students);
-        }
-      } catch (err) {
-        setError('Failed to load dashboard.');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, [token]);
 
-  const verifyStudent = async (studentWallet) => {
+  const fetchData = async () => {
     try {
-        const response = await fetch(`${API_URL}/api/college/verify-student`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ studentWallet })
+      const studentRes = await fetch('http://localhost:8000/api/college/students', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const studentData = await studentRes.json();
+      if (studentData.success) {
+        setStudents(studentData.students);
+        const verified = studentData.students.filter(s => s.details?.isVerifiedByCollege).length;
+        setStats({
+          totalStudents: studentData.students.length,
+          verifiedStudents: verified,
+          placementTruthRate: 88, // Mocked for now
+          flags: 0
         });
-        const data = await response.json();
-        if(data.success) {
-            alert("Student identity verified safely for the ledger!");
-            setStudents(students.map(s => s.walletAddress === studentWallet ? { ...s, details: { ...s.details, isVerifiedByCollege: true } } : s));
-        } else {
-            alert(data.error);
-        }
-    } catch(err) {
-        alert(err.message);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!account) return <div className="container-custom py-20 text-center">Connect your wallet to access the College Dashboard.</div>;
-  if (loading) return <div className="container-custom py-20 text-center">Loading dashboard...</div>;
+  const handleVerifyStudent = async (studentWallet) => {
+    try {
+      const res = await fetch('http://localhost:8000/api/college/verify-student', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ studentWallet })
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading College Interface...</div>;
 
   return (
     <div className="container-custom py-12">
-      <h1 className="text-4xl font-black mb-8">College Dashboard</h1>
-      {error && <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl mb-4 text-red-500">{error}</div>}
-      
-      {stats && (
-        <div className="premium-card p-8 mb-8">
-          <div className="flex flex-col md:flex-row gap-8">
-            <div className="flex-1">
-              <h2 className="text-2xl font-black mb-2">Placement Statistics</h2>
-              <ul className="text-slate-400 space-y-2">
-                <li>Placement Rate: <span className="font-bold text-white">{stats.placementRate}%</span></li>
-                <li>Average Salary: <span className="font-bold text-white">₹{stats.averageSalary}</span></li>
-                <li>Verified Placements: <span className="font-bold text-white">{stats.verifiedPlacements}</span></li>
-              </ul>
-            </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-black mb-2">Anomaly Detection</h2>
-              {anomalyFlag ? (
-                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 font-bold">High fraud attempts detected! Review placements.</div>
-              ) : (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-emerald-500 font-bold">No anomalies detected. Valid Ledger.</div>
-              )}
-            </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+        <div>
+          <h1 className="text-4xl font-black text-white mb-2">Institutional Admin</h1>
+          <p className="text-slate-400">Verifying the identity of students to prevent institutional impersonation.</p>
+        </div>
+        <div className="flex gap-4">
+           <div className="px-6 py-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Truth Score</span>
+              <span className="text-2xl font-black text-emerald-500">{stats.placementTruthRate}%</span>
+           </div>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+          <h4 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-4">Total Roster</h4>
+          <p className="text-4xl font-black text-white">{stats.totalStudents}</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+          <h4 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-4">Identity Verified</h4>
+          <p className="text-4xl font-black text-white">{stats.verifiedStudents}</p>
+        </div>
+        <div className="bg-slate-900 border border-indigo-500/20 p-6 rounded-2xl">
+          <h4 className="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-4">Pending Approval</h4>
+          <p className="text-4xl font-black text-indigo-400">{stats.totalStudents - stats.verifiedStudents}</p>
+        </div>
+        <div className="bg-slate-900 border border-red-500/10 p-6 rounded-2xl outline outline-1 outline-red-500/5">
+          <h4 className="text-red-500 font-bold text-xs uppercase tracking-widest mb-4">Fraud Flags</h4>
+          <p className="text-4xl font-black text-red-500">{stats.flags}</p>
+        </div>
+      </div>
+
+      {/* Student List */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+          <h3 className="text-xl font-bold text-white">Student Enrollment Verification</h3>
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+             <button className="px-4 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold">All Students</button>
+             <button className="px-4 py-1.5 text-slate-500 hover:text-slate-300 rounded-lg text-xs font-bold">Pending Only</button>
           </div>
         </div>
-      )}
-
-      {/* Student Verification Table */}
-      <div className="premium-card overflow-hidden !p-0">
-        <div className="p-8 border-b border-white/5">
-            <h2 className="text-2xl font-black">Enrolled Students Identity Verification</h2>
-            <p className="text-sm text-slate-400 mt-2">Approve students to allow them to securely receive placement verification from companies under your banner.</p>
-        </div>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left">
-                <thead>
-                    <tr className="bg-white/5">
-                        <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500">Student Name</th>
-                        <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500">Course & Year</th>
-                        <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500">ID / Enrollment</th>
-                        <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                    {students.map((student, i) => (
-                        <tr key={i}>
-                            <td className="px-8 py-6">{student.name} <br/><span className="text-xs text-slate-500">{student.email}</span></td>
-                            <td className="px-8 py-6">{student.details?.course} <br/><span className="text-xs text-slate-500">Year: {student.details?.year}</span></td>
-                            <td className="px-8 py-6 font-mono text-white">{student.details?.enrollmentId || "N/A"}</td>
-                            <td className="px-8 py-6">
-                                {student.details?.isVerifiedByCollege ? (
-                                    <span className="badge-verified">Verified Active</span>
-                                ) : (
-                                    <button onClick={() => verifyStudent(student.walletAddress)} className="btn-primary btn-sm">Verify ID</button>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                    {students.length === 0 && (
-                        <tr><td colSpan="4" className="px-8 py-6 text-center text-slate-500">No students found assigned to this college yet.</td></tr>
+        <div className="p-0">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-950/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 border-b border-slate-800">
+                <th className="px-8 py-4">Identity & Wallet</th>
+                <th className="px-8 py-4">Academic Details</th>
+                <th className="px-8 py-4">Status</th>
+                <th className="px-8 py-4 text-right">Verification</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {students.map((s, i) => (
+                <tr key={i} className="hover:bg-slate-800/20 transition-all">
+                  <td className="px-8 py-6">
+                    <div className="font-bold text-white mb-1">{s.name || "Anonymous User"}</div>
+                    <div className="text-xs font-mono text-slate-500 truncate w-40">{s.walletAddress}</div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="text-sm text-slate-300">{s.details?.course || "Undeclared Course"}</div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase">ID: {s.details?.enrollmentId || "N/A"}</div>
+                  </td>
+                  <td className="px-8 py-6">
+                    {s.details?.isVerifiedByCollege ? (
+                      <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded text-[10px] font-black uppercase border border-emerald-500/20">Official Student</span>
+                    ) : (
+                      <span className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-[10px] font-black uppercase border border-slate-700">Guest / Unverified</span>
                     )}
-                </tbody>
-            </table>
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    {!s.details?.isVerifiedByCollege && (
+                      <button 
+                        onClick={() => handleVerifyStudent(s.walletAddress)}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all transform active:scale-95"
+                      >
+                        Confirm Enrollment
+                      </button>
+                    )}
+                    {s.details?.isVerifiedByCollege && (
+                      <div className="text-emerald-500 flex items-center justify-end gap-2 text-xs font-bold">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                        Identity Sealed
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {students.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="p-20 text-center text-slate-500">
+                     <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 grayscale opacity-20">
+                        <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a7 7 0 00-7 7v1h12v-1a7 7 0 00-7-7z"></path></svg>
+                     </div>
+                     <p className="font-bold uppercase tracking-widest text-xs">No students have linked to this institution yet.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

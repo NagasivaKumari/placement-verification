@@ -17,29 +17,25 @@ const Header = ({ account, token, userRole, connectWallet, onLogout }) => {
               </svg>
             </div>
             <div>
-              <span className="text-2xl font-black gradient-text tracking-tighter block leading-tight">TruePlacement</span>
-              <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] block">Proof of Employment Ledger</span>
+              <span className="text-2xl font-black gradient-text tracking-tighter block leading-tight">CollegeTruth</span>
+              <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] block underline decoration-indigo-500/30 underline-offset-4">Transparent Placement Network</span>
             </div>
           </Link>
 
           <nav className="hidden md:flex items-center gap-2">
             {!userRole ? (
               <>
-                <Link to="/" className={`nav-link ${isActive('/') ? 'nav-link-active' : ''}`}>Home</Link>
-                <Link to="/leaderboard" className={`nav-link ${isActive('/leaderboard') ? 'nav-link-active' : ''}`}>Leaderboard</Link>
-                <Link to="/verify" className={`nav-link ${isActive('/verify') ? 'nav-link-active' : ''}`}>Verify Proofs</Link>
+                <Link to="/" className={`nav-link ${isActive('/') ? 'nav-link-active' : ''}`}>Vision</Link>
+                <Link to="/leaderboard" className={`nav-link ${isActive('/leaderboard') ? 'nav-link-active' : ''}`}>Institutional Ranks</Link>
+                <Link to="/verify" className={`nav-link ${isActive('/verify') ? 'nav-link-active' : ''}`}>Credential Audit</Link>
               </>
             ) : (
               <>
                 <Link to={`/${userRole}/dashboard`} className={`nav-link ${isActive(`/${userRole}/dashboard`) ? 'nav-link-active' : ''}`}>
                   {userRole.charAt(0).toUpperCase() + userRole.slice(1)} Dashboard
                 </Link>
-                {userRole === 'college' && (
-                  <Link to="/leaderboard" className={`nav-link ${isActive('/leaderboard') ? 'nav-link-active' : ''}`}>Global Ranks</Link>
-                )}
-                {userRole === 'company' && (
-                  <Link to="/verify" className={`nav-link ${isActive('/verify') ? 'nav-link-active' : ''}`}>Audit Network</Link>
-                )}
+                <Link to="/leaderboard" className={`nav-link ${isActive('/leaderboard') ? 'nav-link-active' : ''}`}>Institutional Audit</Link>
+                <Link to="/verify" className={`nav-link ${isActive('/verify') ? 'nav-link-active' : ''}`}>Verify Individual</Link>
               </>
             )}
           </nav>

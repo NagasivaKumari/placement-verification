@@ -35,6 +35,10 @@ function App() {
     }
     if (savedRole) {
       setUserRole(savedRole);
+      // Redirect if on landing page
+      if (window.location.pathname === '/') {
+        navigate(`/${savedRole}/dashboard`);
+      }
     }
   }, []);
 

@@ -4,6 +4,7 @@ const CollegeLeaderboard = () => {
     const [stats, setStats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const API_URL = 'http://localhost:8000';
 
@@ -27,10 +28,7 @@ const CollegeLeaderboard = () => {
         fetchStats();
     }, []);
 
-    const getTrustScore = (stat) => {
-        if (stat.totalOffers === 0) return 0;
-        return Math.round((stat.fullyVerified / stat.totalOffers) * 100);
-    };
+    const filteredStats = stats.filter(c => c.college.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (loading) {
         return (
@@ -48,10 +46,24 @@ const CollegeLeaderboard = () => {
                    Blockchain Audit Live
                 </div>
                 <h1 className="text-5xl font-black mb-4">Institutional <span className="gradient-text">Trust Scoreboard.</span></h1>
-                <p className="text-slate-400 max-w-2xl">
+                <p className="text-slate-400 max-w-2xl mb-8">
                     We rank colleges by their **Verified Employment Rate**, not just offer letters. 
-                    <br/>Our algorithms filter out "Ghost Offers" and unconfirmed claims.
+                    <br/>Parents & Students: Search for a college below to view its true cryptographically sealed placement numbers before paying fees.
                 </p>
+
+                {/* Public Search Bar */}
+                <div className="max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl p-2 flex items-center shadow-xl">
+                    <div className="px-4 text-slate-500">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input 
+                        type="text" 
+                        placeholder="Search for a College or University..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-transparent border-none outline-none text-white placeholder-slate-500 text-lg py-3"
+                    />
+                </div>
             </header>
 
             {error && (
@@ -62,12 +74,12 @@ const CollegeLeaderboard = () => {
             )}
 
             <div className="grid grid-cols-1 gap-6">
-                {stats.length === 0 ? (
+                {filteredStats.length === 0 ? (
                     <div className="glass-card p-12 text-center text-slate-500">
-                        No auditing data available yet. Be the first to verify a college!
+                        {searchQuery ? `No verifiable audits found for "${searchQuery}".` : "No auditing data available yet."}
                     </div>
                 ) : (
-                    stats.map((college, idx) => (
+                    filteredStats.map((college, idx) => (
                         <div key={idx} className={`premium-card group hover:scale-[1.01] transition-all duration-300 ${college.isAnomaly ? 'border-red-500/30' : ''}`}>
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
                                 <div className="flex-1">

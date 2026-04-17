@@ -61,9 +61,9 @@ const VerifyPlacement = () => {
   return (
     <div className="container-custom py-20 flex flex-col items-center">
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-black mb-4 tracking-tight">Public <span className="gradient-text">Verification Gate.</span></h1>
-        <p className="text-slate-400 max-w-xl mx-auto italic">
-          Access the Proof-of-Employment ledger to verify credentials or confirm your own career milestones.
+        <h1 className="text-5xl font-black mb-4 tracking-tight">Credential <span className="gradient-text italic">Audit Hub.</span></h1>
+        <p className="text-slate-400 max-w-xl mx-auto italic leading-relaxed">
+          The non-repudiable audit portal for the Algorand employment ledger. Verify individual career milestones or professional certificates instantly.
         </p>
       </div>
 
@@ -148,17 +148,29 @@ const VerifyPlacement = () => {
                  <TalentPassport placement={result} />
                ) : (
                  <div>
-                    <div className="flex justify-between items-start mb-6">
-                       <div>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Employee Identity</p>
-                          <h3 className="text-3xl font-black text-white">{result.studentName}</h3>
-                          <p className="text-indigo-400 font-bold text-sm tracking-tight">{result.role} @ {result.companyName}</p>
-                       </div>
-                       <div className="text-right">
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Verify Tier</p>
-                          <span className="badge-verified">Tier 3 Verified</span>
-                       </div>
-                    </div>
+                     <div>
+                        <div className="flex flex-col mb-6 bg-indigo-600/10 border border-indigo-500/20 p-4 rounded-2xl relative overflow-hidden">
+                           <div className="absolute top-0 right-0 p-2 opacity-10">
+                              <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                           </div>
+                           <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
+                              On-Chain Authenticity Proof
+                           </p>
+                           <p className="text-[10px] text-slate-400 mb-1">Digitally Signed By (Employer Wallet):</p>
+                           <p className="text-xs font-mono text-white break-all">{result.companyWallet}</p>
+                        </div>
+                        <div className="flex justify-between items-start mb-6">
+                           <div>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Employee Identity</p>
+                              <h3 className="text-3xl font-black text-white">{result.studentName}</h3>
+                              <p className="text-indigo-400 font-bold text-sm tracking-tight">{result.role} @ {result.companyName}</p>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Verify Tier</p>
+                              <span className="badge-verified">Tier 3 Verified</span>
+                           </div>
+                        </div>
                     
                     <div className="grid grid-cols-2 gap-4 mb-8">
                        <div className="bg-white/5 p-4 rounded-2xl border border-white/5">

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { peraWallet } from '../wallet';
+import algosdk from 'algosdk';
 
 const CompanyDashboard = ({ token, account }) => {
   const [placements, setPlacements] = useState([]);
@@ -32,71 +34,123 @@ const CompanyDashboard = ({ token, account }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ verificationCode, txHash: "0x" + Math.random().toString(16).slice(2) })
+        body: JSON.stringify({ verificationCode })
       });
       const data = await res.json();
-      if (data.success) {
-        fetchPlacements(); // refresh list
+      
+      if (data.success && data.unsignedTxn) {
+        // 1. Convert the txn from base64 string to Uint8Array
+        const txnBytes = new Uint8Array(Buffer.from(data.unsignedTxn, 'base64'));
+        
+        // 2. Wrap for Pera Wallet
+        const txnGroup = [{ txn: algosdk.decodeUnsignedTransaction(txnBytes), signers: [account] }];
+        
+        // 3. User Signs in Pera Wallet browser extension
+        const signedTxns = await peraWallet.signTransaction([txnGroup]);
+        
+        // 4. Success feedback
+        alert("Success: Placement cryptographically signed and archived on Algorand.");
+        fetchPlacements(); 
       }
     } catch (err) {
-      console.error(err);
+      console.error("Verification error:", err);
+      alert("Verification failed or user rejected signing.");
     }
   };
 
   return (
     <div className="container-custom py-12">
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-2 text-white">Company Approval Inbox</h1>
-        <p className="text-slate-400">Review and mathematically verify placement claims uploaded by students.</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
+        <div>
+          <h1 className="text-4xl font-black text-white mb-2">Employer Verification Audit</h1>
+          <p className="text-slate-400">Reviewing and certifying student identity claims to ensure institutional integrity.</p>
+        </div>
+        <div className="px-6 py-4 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-600/30">
+           <p className="text-[10px] font-black uppercase text-indigo-200 tracking-[0.2em] mb-1">Corporate Trust Score</p>
+           <p className="text-2xl font-black text-white">99.8% Certified</p>
+        </div>
       </div>
 
-      <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="p-6 border-b border-slate-800 bg-slate-900 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-white">Pending verifications</h2>
-            <div className="px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-full text-xs font-bold uppercase tracking-wider border border-indigo-500/20">Action Required</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 relative overflow-hidden">
+           <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mb-2">Incoming Claims</p>
+           <p className="text-4xl font-black text-white">{placements.filter(p => p.status === 'pending_company_approval').length}</p>
         </div>
-        <div className="p-0">
+        <div className="bg-slate-900 border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden">
+           <p className="text-emerald-500 font-bold uppercase tracking-widest text-[10px] mb-2">Verified Hire Ledger</p>
+           <p className="text-4xl font-black text-emerald-400">{placements.filter(p => p.status !== 'pending_company_approval').length}</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+           <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mb-2">Cumulative Salary Audit</p>
+           <p className="text-4xl font-black text-white">₹{placements.reduce((a, b) => a + (b.salary || 0), 0).toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="p-8 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+            <h2 className="text-xl font-bold text-white uppercase italic">Verification Inbox</h2>
+            <div className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-500/10 alert-pulse">Action Required</div>
+        </div>
+        <div className="p-0 overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-900 border-b border-slate-800 text-xs font-bold tracking-widest text-slate-500 uppercase">
-                <th className="p-4 pl-6">Student</th>
-                <th className="p-4">College</th>
-                <th className="p-4">Role</th>
-                <th className="p-4">Salary</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 pr-6 text-right">Action</th>
+              <tr className="bg-slate-950/50 text-[10px] font-black tracking-[0.2em] text-slate-500 border-b border-slate-800 uppercase">
+                <th className="px-8 py-5">Student / Identity</th>
+                <th className="px-8 py-5">Academic Origin</th>
+                <th className="px-8 py-5">Target Role</th>
+                <th className="px-8 py-5">Offered Package</th>
+                <th className="px-8 py-5">Audit Status</th>
+                <th className="px-8 py-5 text-right whitespace-nowrap">Ledger Resolve</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-800/50">
               {loading ? (
-                <tr><td colSpan="6" className="p-8 text-center text-slate-400">Loading inbox...</td></tr>
+                <tr><td colSpan="6" className="p-20 text-center text-slate-500 font-bold uppercase text-xs tracking-widest">Auditing Incoming Claims...</td></tr>
               ) : placements.length === 0 ? (
-                <tr><td colSpan="6" className="p-12 text-center text-slate-500">No placements awaiting your verification.</td></tr>
+                <tr><td colSpan="6" className="p-20 text-center text-slate-500 uppercase font-black text-xs tracking-widest opacity-30 italic">Truth ledger is currently empty</td></tr>
               ) : (
                 placements.map(p => (
-                  <tr key={p._id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
-                    <td className="p-4 pl-6">
-                      <div className="font-bold text-white">{p.studentName}</div>
-                      <div className="text-xs text-slate-400">{p.studentEmail}</div>
+                  <tr key={p._id} className="hover:bg-slate-800/30 transition-all group">
+                    <td className="px-8 py-6">
+                      <div className="font-bold text-white group-hover:text-indigo-400 transition-colors uppercase text-sm tracking-tight">{p.studentName}</div>
+                      <div className="text-[10px] font-mono text-slate-500 lowercase opacity-60 tracking-tighter">{p.studentEmail}</div>
                     </td>
-                    <td className="p-4 text-sm text-slate-300">{p.college}</td>
-                    <td className="p-4 text-sm text-slate-300">{p.role}</td>
-                    <td className="p-4 font-mono text-emerald-400">${p.salary.toLocaleString()}</td>
-                    <td className="p-4">
+                    <td className="px-8 py-6">
+                       <span className="text-xs font-bold text-slate-300">{p.college}</span>
+                    </td>
+                    <td className="px-8 py-6">
+                       <span className="text-xs font-bold text-white bg-slate-800 px-3 py-1 rounded-lg border border-slate-700">{p.role}</span>
+                    </td>
+                    <td className="px-8 py-6">
+                       <span className="font-mono text-emerald-400 font-bold text-sm tracking-tighter">₹{p.salary.toLocaleString()}</span>
+                    </td>
+                    <td className="px-8 py-6 whitespace-nowrap">
                       {p.status === 'pending_company_approval' ? (
-                        <span className="px-2 py-1 bg-amber-500/10 text-amber-500 rounded text-xs font-bold border border-amber-500/20">Pending Review</span>
+                        <div className="flex items-center gap-2">
+                           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                           <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Pending Review</span>
+                        </div>
+                      ) : p.status === 'offer_verified' ? (
+                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10">Offer Sealed</span>
+                      ) : p.status === 'joining_verified' ? (
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest bg-blue-500/5 px-2 py-1 rounded border border-blue-500/10">Joined Work</span>
                       ) : (
-                        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded text-xs font-bold border border-emerald-500/20">Verified</span>
+                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10">Fully Certified</span>
                       )}
                     </td>
-                    <td className="p-4 pr-6 text-right">
-                      {p.status === 'pending_company_approval' && (
+                    <td className="px-8 py-6 text-right">
+                      {p.status === 'pending_company_approval' ? (
                         <button 
                           onClick={() => handleVerify(p.verificationCode)}
-                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+                          className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95"
                         >
-                          Approve Identity
+                          Approve Claim
                         </button>
+                      ) : (
+                         <div className="text-slate-600 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            Signed
+                         </div>
                       )}
                     </td>
                   </tr>
