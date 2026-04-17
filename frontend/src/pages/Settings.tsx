@@ -176,18 +176,28 @@ const Settings = ({ token, account, userRole }) => {
                              </div>
                              <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Resume / Talent Profile</label>
-                                <div className="bg-slate-950 border border-slate-800 rounded-xl p-1 flex items-center">
+                                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-1 flex items-center gap-2">
                                    <input 
                                      type="text" readOnly placeholder="Upload PDF/Doc or IPFS link..." 
                                      value={profile.details.resumeUrl || ''} 
                                      className="flex-1 bg-transparent border-none px-4 py-1.5 text-white text-sm outline-none" 
                                    />
                                    <input type="file" ref={resumeInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'resume')} />
+                                   
+                                   {profile.details.resumeUrl && (
+                                     <button 
+                                       onClick={() => window.open(profile.details.resumeUrl?.startsWith('http') ? profile.details.resumeUrl : `https://ipfs.io/ipfs/${profile.details.resumeUrl}`, '_blank')}
+                                       className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                                     >
+                                       View
+                                     </button>
+                                   )}
+                                   
                                    <button 
                                      onClick={() => resumeInputRef.current.click()}
-                                     className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                                     className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap"
                                    >
-                                     Upload
+                                     {profile.details.resumeUrl ? 'Update' : 'Upload'}
                                    </button>
                                 </div>
                                 <p className="text-[9px] text-slate-500 mt-2 italic px-1">Supports PDF, Word, or IPFS CID. Linked to your Soulbound Portrait.</p>

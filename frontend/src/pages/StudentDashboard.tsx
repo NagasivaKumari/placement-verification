@@ -149,6 +149,20 @@ const StudentDashboard = ({ token, account }) => {
                <div className="text-center md:text-left">
                   <p className="text-indigo-400 font-black uppercase tracking-[0.3em] text-[10px] mb-3">SBT Identity Passport</p>
                   <h1 className="text-4xl md:text-5xl font-black text-white italic tracking-tight mb-4">{profile?.name || "Student Node"}</h1>
+                  
+                  {profile?.details?.resumeUrl && (
+                     <div className="mb-4">
+                        <button 
+                          onClick={() => window.open(profile.details.resumeUrl?.startsWith('http') ? profile.details.resumeUrl : `https://ipfs.io/ipfs/${profile.details.resumeUrl}`, '_blank')}
+                          className="text-[10px] text-slate-400 font-black uppercase tracking-widest hover:text-white transition-all flex items-center gap-2 group"
+                        >
+                           <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                           View Active Resume
+                           <span className="opacity-0 group-hover:opacity-100 transition-all ml-1">→</span>
+                        </button>
+                     </div>
+                   )}
+
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
                      <span className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[10px] font-black text-emerald-400 uppercase tracking-widest">🛡️ Identity verified</span>
                      <span className="flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest">Algorand Mainnet Linked</span>
