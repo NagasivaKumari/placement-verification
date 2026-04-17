@@ -247,10 +247,13 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
                     className="w-full bg-slate-900 border border-indigo-500/50 rounded-xl p-4 text-center text-2xl font-black tracking-[0.5em] placeholder:tracking-normal placeholder:font-medium text-white focus:ring-4 ring-indigo-500/20 outline-none mb-4"
                     maxLength={6}
                   />
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-4">
                     <button onClick={() => setRegPhase(0)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all">Back</button>
                     <button onClick={registerRole} className="flex-[2] btn-primary py-3">Finish Registration</button>
                   </div>
+                  <button onClick={handleSendOTP} disabled={isSendingOtp} className="w-full text-center text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-50">
+                    {isSendingOtp ? "Sending..." : "Didn't receive it? Resend OTP"}
+                  </button>
                 </div>
               )}
               
@@ -328,11 +331,23 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link to="/leaderboard" className="btn-primary w-full sm:w-auto text-lg py-4 px-10">
-                View Proof-of-Truth Leaderboard
-              </Link>
-              <Link to="/verify" className="btn-outline w-full sm:w-auto text-lg py-4 px-10">
-                Verify a Professional
+              {userRole ? (
+                <Link to={`/${userRole}/dashboard`} className="btn-primary w-full sm:w-auto text-lg py-4 px-10 flex items-center justify-center gap-2">
+                  Go to {userRole.charAt(0).toUpperCase() + userRole.slice(1)} Dashboard
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                </Link>
+              ) : !account ? (
+                <button onClick={connectWallet} className="btn-primary w-full sm:w-auto text-lg py-4 px-10 flex items-center justify-center gap-2">
+                   Connect Wallet to Start
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </button>
+              ) : (
+                <button onClick={() => setShowRoleModal(true)} className="btn-primary w-full sm:w-auto text-lg py-4 px-10">
+                   Complete Registration
+                </button>
+              )}
+              <Link to="/leaderboard" className="btn-outline w-full sm:w-auto text-lg py-4 px-10">
+                View Leaderboard
               </Link>
             </div>
           </div>

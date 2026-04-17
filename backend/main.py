@@ -231,11 +231,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 async def send_real_otp(email, otp):
-    smtp_server = os.getenv("SMTP_SERVER")
-    smtp_port = os.getenv("SMTP_PORT", 587)
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    from_email = os.getenv("FROM_EMAIL", "verify@collegetruth.io")
+    smtp_server = os.getenv("SMTP_SERVER", "").strip()
+    smtp_port = os.getenv("SMTP_PORT", "587").strip()
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+    from_email = os.getenv("FROM_EMAIL", "verify@collegetruth.io").strip()
 
     if not smtp_user or not smtp_password:
         print(f"\n[SMTP MISSING] Check .env for SMTP credentials. \nDEMO OTP for {email}: {otp}\n")
@@ -248,16 +248,61 @@ async def send_real_otp(email, otp):
 
     text = f"Your verification code is: {otp}"
     html = f"""
+    <!DOCTYPE html>
     <html>
-      <body style="font-family: sans-serif; color: #333;">
-        <h2 style="color: #4f46e5;">CollegeTruth Verification</h2>
-        <p>Your secure identity verification code is:</p>
-        <div style="background: #f3f4f6; padding: 20px; font-size: 24px; font-weight: bold; border-radius: 10px; text-align: center; letter-spacing: 5px;">
-          {otp}
-        </div>
-        <p style="font-size: 12px; color: #666; margin-top: 20px;">
-          This code will bind your wallet to your institutional identity on the Algorand blockchain.
-        </p>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {{ margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-font-smoothing: antialiased; }}
+          .wrapper {{ width: 100%; table-layout: fixed; background-color: #f8fafc; padding-bottom: 60px; }}
+          .main {{ background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); margin-top: 40px; }}
+          .header {{ background-color: #0f172a; padding: 40px 30px; text-align: center; border-bottom: 4px solid #4f46e5; }}
+          .header h1 {{ color: #ffffff; margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -1px; }}
+          .header p {{ color: #818cf8; margin: 5px 0 0 0; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; }}
+          .content {{ padding: 40px 30px; color: #334155; line-height: 1.6; }}
+          .content h2 {{ color: #0f172a; font-size: 20px; font-weight: 700; margin-top: 0; }}
+          .content p {{ font-size: 16px; margin-bottom: 24px; }}
+          .otp-container {{ background: linear-gradient(to right, #f8fafc border-box, #e2e8f0 border-box); background-color: #f1f5f9; padding: 30px; border-radius: 12px; text-align: center; margin: 30px 0; border: 1px dashed #cbd5e1; }}
+          .otp-code {{ font-size: 36px; font-weight: 900; color: #4f46e5; letter-spacing: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
+          .otp-label {{ font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }}
+          .warning {{ background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 6px; font-size: 14px; color: #92400e; }}
+          .footer {{ text-align: center; padding: 30px; color: #94a3b8; font-size: 12px; border-top: 1px solid #f1f5f9; }}
+          .footer a {{ color: #4f46e5; text-decoration: none; font-weight: 600; }}
+        </style>
+      </head>
+      <body>
+        <center class="wrapper">
+          <table class="main" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td class="header">
+                <h1>CollegeTruth</h1>
+                <p>Transparent Placement Network</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="content">
+                <h2>Welcome to the Trust Ledger!</h2>
+                <p>Thank you for initiating the registration process. To ensure the integrity of our blockchain-anchored placement data, we need to verify your institutional identity.</p>
+                <p>Please use the following single-use verification code to securely bind your wallet address to this email:</p>
+                
+                <div class="otp-container">
+                  <span class="otp-label">Your Security Code</span>
+                  <div class="otp-code">{otp}</div>
+                </div>
+                
+                <div class="warning">
+                  <strong>Security Notice:</strong> The CollegeTruth protocol will never ask for your private keys or mnemonic phrases. This code expires in 10 minutes.
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="footer">
+                <p>If you did not request this verification, please ignore this email.</p>
+                <p>&copy; 2026 CollegeTruth Project. All rights reserved.</p>
+              </td>
+            </tr>
+          </table>
+        </center>
       </body>
     </html>
     """

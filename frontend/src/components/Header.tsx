@@ -43,40 +43,57 @@ const Header = ({ account, token, userRole, connectWallet, onLogout }) => {
           <div className="flex items-center gap-4">
             {account ? (
               <div className="relative group">
-                <button className="flex items-center gap-2.5 bg-slate-800/50 hover:bg-slate-800 backdrop-blur-md border border-white/10 px-4 py-2.5 rounded-2xl transition-all duration-300 shadow-xl group/btn">
-                  <div className="bg-indigo-500/20 p-1.5 rounded-lg border border-indigo-500/20 group-hover/btn:bg-indigo-500/30 transition-colors">
-                    <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                <button className="flex items-center gap-2.5 bg-[#1e293b] hover:bg-slate-800 border border-white/10 px-4 py-2 rounded-2xl transition-all duration-300 shadow-xl group/btn">
+                  <div className="w-8 h-8 flex-shrink-0 bg-[#ffeb3b] rounded-lg flex items-center justify-center shadow-lg shadow-yellow-500/20">
+                    <svg className="w-5 h-5 text-black" viewBox="0 0 24 24" fill="currentColor">
+                       <circle cx="12" cy="12" r="3" />
+                       <path d="M12 2v4m0 12v4M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
                   </div>
-                  <div className="text-left leading-none">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{userRole ? userRole : 'Connected'}</p>
-                    <p className="text-xs text-white font-mono font-black">{account.slice(0, 6)}...{account.slice(-4)}</p>
+                  <div className="text-left leading-none uppercase">
+                    <p className="text-[14px] text-white font-mono font-black tracking-tight">{account.slice(0, 4)}...{account.slice(-4)}</p>
                   </div>
                   <svg className="w-4 h-4 text-slate-500 ml-1 group-hover/btn:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
 
                 {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-3 w-64 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl opacity-0 translate-y-2 invisible group-hover:opacity-100 group-hover:translate-y-0 group-hover:visible transition-all duration-300 z-50 p-4 overflow-hidden">
-                  <div className="text-center mb-4 border-b border-white/5 pb-4">
-                    <div className="bg-indigo-500/10 w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center border border-indigo-500/20">
-                        <span className="text-indigo-400 font-black text-xs">{account.slice(0, 2)}</span>
+                <div className="absolute right-0 mt-3 w-72 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl opacity-0 translate-y-2 invisible group-hover:opacity-100 group-hover:translate-y-0 group-hover:visible transition-all duration-300 z-50 p-5">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-2">
+                       <span className="text-[13px] text-white font-mono font-bold">{account.slice(0, 8)}...{account.slice(-4)}</span>
+                       <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(account);
+                            alert('Address copied!');
+                          }}
+                          className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+                       >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 012-2v-8a2 2 0 01-2-2h-8a2 2 0 01-2 2v8a2 2 0 012 2z"></path></svg>
+                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active Wallet</p>
-                    <p className="text-[10px] text-white font-mono break-all line-clamp-2 px-2 mt-1">{account}</p>
+                    <a 
+                      href={`https://testnet.explorer.perawallet.app/address/${account}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-[13px] text-emerald-400 font-bold underline hover:text-emerald-300 pt-1"
+                    >
+                      View
+                    </a>
                   </div>
                   
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     {userRole && (
-                        <Link to={`/${userRole}/settings`} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-700/50 text-slate-300 transition-colors group/link">
+                        <Link to={`/${userRole}/settings`} className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 text-slate-300 transition-colors group/link">
                             <svg className="w-5 h-5 text-slate-500 group-hover/link:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             <span className="text-xs font-bold uppercase tracking-widest">Settings</span>
                         </Link>
                     )}
                     <button 
                       onClick={onLogout}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-500/10 text-slate-300 hover:text-red-400 transition-all group/logout"
+                      className="flex items-center gap-4 px-3 py-3 rounded-xl border border-white/5 bg-white/5 hover:bg-red-500/10 text-slate-300 hover:text-red-400 transition-all group/logout"
                     >
-                      <svg className="w-5 h-5 text-slate-500 group-hover/logout:text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      <svg className="w-5 h-5 text-slate-400 group-hover/logout:text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                       </svg>
                       <span className="text-xs font-bold uppercase tracking-widest">Disconnect</span>
                     </button>
