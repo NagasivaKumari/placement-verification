@@ -141,6 +141,19 @@ const StudentDashboard = ({ token, account }) => {
     }
   };
 
+  const handleUpdateResume = async (url) => {
+    try {
+      await fetch('http://localhost:8000/api/user/profile/resume', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ resumeUrl: url })
+      });
+      fetchProfile();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="container-custom py-12">
       {/* Identity Passport Banner */}
@@ -153,7 +166,13 @@ const StudentDashboard = ({ token, account }) => {
             <div className="flex-1 text-center md:text-left">
                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
                   <h1 className="text-4xl font-black text-white italic">{profile?.name || "Verified Student"}</h1>
-                  <span className="badge-verified bg-emerald-500 text-white border-none py-1">Identity Anchored</span>
+                  <div className="flex items-center gap-2">
+                     <span className="badge-verified bg-emerald-500 text-white border-none py-1">Identity Anchored</span>
+                     <div className="px-3 py-1 bg-indigo-600 rounded-full flex items-center gap-1.5 border border-white/20">
+                        <span className="text-[10px] font-black text-indigo-100 uppercase tracking-widest">Trust</span>
+                        <span className="text-sm font-black text-white">{profile?.trustScore || 0}%</span>
+                     </div>
+                  </div>
                </div>
                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4">
                   <p className="text-slate-400 font-bold">{profile?.details?.college || "Global User"} <span className="text-slate-600 mx-2">|</span> {profile?.details?.course || "Not Programmed"}</p>
@@ -174,6 +193,19 @@ const StudentDashboard = ({ token, account }) => {
                        <p className="text-xs font-bold text-white">{profile.details.degreeName} ({profile.details.graduationYear})</p>
                     </div>
                   )}
+                  <div className="bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 flex items-center gap-3">
+                     <div className="flex flex-col">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Professional Resume</p>
+                        {profile?.details?.resumeUrl ? (
+                          <a href={profile.details.resumeUrl} target="_blank" className="text-xs font-bold text-indigo-400 hover:underline">View Document 📄</a>
+                        ) : (
+                          <button onClick={() => {
+                            const url = prompt("Enter your Resume Link (Google Drive/Dropbox/Cloud):");
+                            if (url) handleUpdateResume(url);
+                          }} className="text-xs font-bold text-slate-400 hover:text-white transition-all">+ Link Resume</button>
+                        )}
+                     </div>
+                  </div>
                </div>
             </div>
          </div>

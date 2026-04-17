@@ -121,6 +121,24 @@ class CompanyApproveRequest(BaseModel):
     verificationCode: str
     txHash: Optional[str] = "0x"
 
+def calculate_trust_score(user_doc, placements=[]):
+    score = 0
+    details = user_doc.get("details", {})
+    
+    # Milestone Weights
+    if details.get("collegeVerified"): score += 40
+    if details.get("degreeVerified"): score += 20
+    
+    # Employment Milestones (from placements)
+    for p in placements:
+        if p.get("status") == "offer_verified": score += 2
+        if p.get("status") == "joining_verified": score += 8
+        if p.get("status") == "salary_verified": score += 10
+        # Cap deployment-based boost
+        if score >= 95: break
+        
+    return min(100, score)
+
 class SubmitSignedTxnRequest(BaseModel):
     verificationCode: str
     signedTxn: str  # base64-encoded signed transaction bytes
@@ -343,13 +361,19 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
     db_user = await db["users"].find_one({"walletAddress": wallet})
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Calculate Trust Score
+    placements_cursor = db["placements"].find({"studentWallet": wallet})
+    user_placements = await placements_cursor.to_list(length=10)
+    trust_score = calculate_trust_score(db_user, user_placements)
+
     return {
         "name": db_user.get("name", ""),
         "email": db_user.get("email", ""),
         "role": db_user.get("role", ""),
         "walletAddress": db_user.get("walletAddress"),
         "details": db_user.get("details", {}),
-        "identityTx": db_user.get("identityTx")
+        "identityTx": db_user.get("identityTx"),
+        "trustScore": trust_score
     }
 
 @app.put("/api/user/profile")
@@ -1010,6 +1034,48 @@ async def get_total_company_stats():
     c_count = await db["users"].count_documents({"role": "company"})
     p_count = await db["placements"].count_documents({})
     return {"totalCompanies": c_count, "totalPlacements": p_count}
+
+# -- Discovery Routes (Talent Pool) --
+@app.get("/api/company/discover-talent")
+async def discover_talent(
+    college: Optional[str] = None, 
+    min_cgpa: Optional[float] = None,
+    course: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    # Security: Only Companies and Colleges can browse talent
+    company = await db["users"].find_one({"walletAddress": user["wallet"]})
+    if not company or company.get("role") not in ["company", "college"]:
+        raise HTTPException(status_code=403, detail="Unauthorized access to talent pool")
+
+    query = {"role": "student", "details.collegeVerified": True}
+    
+    if college:
+        query["details.college"] = {"$regex": college, "$options": "i"}
+    if min_cgpa:
+        query["details.cgpa"] = {"$gte": str(min_cgpa)}
+    if course:
+        query["details.course"] = {"$regex": course, "$options": "i"}
+
+    cursor = db["users"].find(query).sort("details.cgpa", -1)
+    talents = await cursor.to_list(length=100)
+    
+    for t in talents:
+        t["_id"] = str(t["_id"])
+        # Fetch placements for score calc
+        p_cursor = db["placements"].find({"studentWallet": t["walletAddress"]})
+        t_placements = await p_cursor.to_list(length=5)
+        t["trustScore"] = calculate_trust_score(t, t_placements)
+        
+    return {"success": True, "talents": talents}
+
+@app.put("/api/user/profile/resume")
+async def update_resume(req: dict, user: dict = Depends(get_current_user)):
+    await db["users"].update_one(
+        {"walletAddress": user["wallet"]},
+        {"$set": {"details.resumeUrl": req.get("resumeUrl"), "details.portfolioUrl": req.get("portfolioUrl")}}
+    )
+    return {"success": True, "message": "Resume updated."}
 
 if __name__ == "__main__":
     import uvicorn

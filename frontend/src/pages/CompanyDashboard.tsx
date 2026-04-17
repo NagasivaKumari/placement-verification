@@ -4,11 +4,36 @@ import algosdk from 'algosdk';
 
 const CompanyDashboard = ({ token, account }) => {
   const [placements, setPlacements] = useState([]);
+  const [talents, setTalents] = useState([]);
+  const [activeTab, setActiveTab] = useState('inbox'); // 'inbox' | 'talents'
   const [loading, setLoading] = useState(true);
+
+  // Filters for talent pool
+  const [filterCgpa, setFilterCgpa] = useState("");
+  const [filterCourse, setFilterCourse] = useState("");
 
   useEffect(() => {
     fetchPlacements();
-  }, []);
+    fetchTalents();
+  }, [token]);
+
+  const fetchTalents = async () => {
+    try {
+      let url = 'http://localhost:8000/api/company/discover-talent';
+      const params = [];
+      if (filterCgpa) params.push(`min_cgpa=${filterCgpa}`);
+      if (filterCourse) params.push(`course=${filterCourse}`);
+      if (params.length) url += `?${params.join('&')}`;
+
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) setTalents(data.talents);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchPlacements = async () => {
     try {
@@ -145,11 +170,17 @@ const CompanyDashboard = ({ token, account }) => {
         </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="p-8 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-white uppercase italic">Verification Inbox</h2>
-            <div className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-500/10 alert-pulse">Action Required</div>
-        </div>
+      <div className="flex gap-4 mb-8">
+        <button onClick={() => setActiveTab('inbox')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'inbox' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Verification Inbox</button>
+        <button onClick={() => setActiveTab('talents')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'talents' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Discover Talent Pool</button>
+      </div>
+
+      {activeTab === 'inbox' ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+          <div className="p-8 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white uppercase italic">Verification Inbox</h2>
+              <div className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-500/10 alert-pulse">Action Required</div>
+          </div>
         <div className="p-0 overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -268,7 +299,62 @@ const CompanyDashboard = ({ token, account }) => {
             </tbody>
           </table>
         </div>
-      </div>
+      ) : (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex flex-wrap gap-4 mb-8 bg-slate-900/50 p-6 rounded-3xl border border-slate-800">
+             <div className="flex-1 min-w-[200px]">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Minimum CGPA</label>
+                <input type="number" step="0.1" placeholder="Search by merit..." value={filterCgpa} onChange={e => setFilterCgpa(e.target.value)} onBlur={fetchTalents} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white w-full outline-none focus:border-indigo-500" />
+             </div>
+             <div className="flex-1 min-w-[200px]">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Specialization / Course</label>
+                <input type="text" placeholder="e.g. Computer Science" value={filterCourse} onChange={e => setFilterCourse(e.target.value)} onBlur={fetchTalents} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white w-full outline-none focus:border-indigo-500" />
+             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {talents.map(t => (
+               <div key={t._id} className="premium-card group hover:border-indigo-500/40 transition-all">
+                   <div className="flex justify-between items-start mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-black text-xl italic">{t.name.charAt(0)}</div>
+                      <div className="flex flex-col items-end gap-1">
+                         <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-1 rounded text-[9px] font-black uppercase">College Verified 🛡️</span>
+                         <div className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-500 rounded-lg">
+                            <span className="text-[8px] font-black text-indigo-100 uppercase tracking-tighter">Trust</span>
+                            <span className="text-[10px] font-black text-white">{t.trustScore || 0}%</span>
+                         </div>
+                      </div>
+                   </div>
+                  <h4 className="text-lg font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors uppercase">{t.name}</h4>
+                  <p className="text-xs text-slate-400 font-bold mb-4">{t.details?.college}</p>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                     <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                        <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Merit Score</p>
+                        <p className="text-sm font-black text-white">{t.details?.cgpa || "N/A"} CGPA</p>
+                     </div>
+                     <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                        <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Stream</p>
+                        <p className="text-sm font-black text-white truncate">{t.details?.branch || t.details?.course || "General"}</p>
+                     </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                     {t.details?.resumeUrl ? (
+                         <a href={t.details.resumeUrl} target="_blank" className="bg-white text-slate-900 text-center py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-slate-200">View Resume 📄</a>
+                     ) : (
+                        <div className="text-center py-2.5 text-slate-500 text-[10px] font-bold uppercase italic bg-slate-950 rounded-xl border border-slate-800/50">Resume Not Linked</div>
+                     )}
+                     <button className="bg-indigo-600/20 text-indigo-400 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Initiate Hiring</button>
+                  </div>
+               </div>
+             ))}
+             {talents.length === 0 && (
+                <div className="col-span-full py-20 text-center text-slate-500 uppercase font-black tracking-widest text-xs opacity-40 italic">No candidates matching these filters.</div>
+             )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
