@@ -11,3 +11,4 @@ algokit-utils
 gunicorn
 python-multipart
 emails
+requests
