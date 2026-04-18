@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PlacementVerify - On-Chain Placement Verification</title>
     <meta name="description" content="Verify college placements on the Conflux blockchain. Zero deception, full transparency." />
+    <script>
+      window.global = window;
+      if (typeof Buffer === 'undefined') {
+        window.Buffer = [];
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

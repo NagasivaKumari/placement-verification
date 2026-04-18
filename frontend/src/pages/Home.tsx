@@ -40,6 +40,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [regError, setRegError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   
   const handleSendOTP = async () => {
     if (!userEmail) return setRegError("Email is required for verification.");
@@ -51,7 +52,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: userEmail })
       });
-      const data = await res.json();
+      const data = await response.json();
       if (data.success) {
         setRegPhase(1);
       } else {
@@ -66,7 +67,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
 
   const registerRole = async () => {
     setRegError("");
-    setLoading(true);
+    setIsLoading(true);
     try {
       let registrationTxId = null;
       
@@ -141,7 +142,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
     } catch (e) {
       setRegError("Network error during registration.");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -273,7 +274,9 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
                   />
                   <div className="flex gap-2 mb-4">
                     <button onClick={() => setRegPhase(0)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all">Back</button>
-                    <button onClick={registerRole} className="flex-[2] btn-primary py-3">Finish Registration</button>
+                    <button onClick={registerRole} disabled={isLoading} className="flex-[2] btn-primary py-3">
+                      {isLoading ? "Processing..." : "Finish Registration"}
+                    </button>
                   </div>
                   <button onClick={handleSendOTP} disabled={isSendingOtp} className="w-full text-center text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-50">
                     {isSendingOtp ? "Sending..." : "Didn't receive it? Resend OTP"}

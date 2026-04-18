@@ -46,9 +46,11 @@ const Settings = ({ token, account, userRole }) => {
         reader.readAsDataURL(file);
       } else if (type === 'resume') {
         const reader = new FileReader();
+        const fileName = file.name;
         reader.onloadend = () => {
           handleDetail('resumeUrl', reader.result);
-          setMessage(`"${file.name}" ready for synchronization.`);
+          handleDetail('resumeName', fileName);
+          setMessage(`"${fileName}" ready for synchronization.`);
         };
         reader.readAsDataURL(file);
       }
@@ -182,36 +184,41 @@ const Settings = ({ token, account, userRole }) => {
                                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-1 flex items-center gap-2">
                                    <input 
                                      type="text" readOnly placeholder="Upload PDF/Doc or IPFS link..." 
-                                     value={profile.details.resumeUrl || ''} 
-                                     className="flex-1 bg-transparent border-none px-4 py-1.5 text-white text-sm outline-none" 
-                                   />
-                                   <input type="file" ref={resumeInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'resume')} />
-                                   
-                                   {profile.details.resumeUrl && (
-                                     <button 
-                                         onClick={() => {
-                                           const url = profile.details.resumeUrl;
-                                           if (url.startsWith('http') || url.startsWith('data:')) {
-                                             window.open(url, '_blank');
-                                           } else if (url.startsWith('Qm') || url.startsWith('ba')) {
-                                             window.open(`https://ipfs.io/ipfs/${url}`, '_blank');
-                                           } else {
-                                             alert(`" ${url} " is a local record with no viewable data. Please re-upload your file.`);
-                                           }
-                                         }}
-                                       className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
-                                     >
-                                       View
-                                     </button>
-                                   )}
+                                 <div className="flex flex-col md:flex-row items-center gap-4">
+                                   <div className="relative flex-1">
+                                      <input 
+                                        type="text" 
+                                        readOnly
+                                        value={profile.details.resumeName || (profile.details.resumeUrl ? "📄 Active Identity Document" : "No resume linked...")} 
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs text-indigo-300 font-bold placeholder-slate-600 focus:border-indigo-500/50 transition-all outline-none"
+                                      />
+                                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                        {profile.details.resumeUrl && (
+                                          <button 
+                                            onClick={() => {
+                                              const url = profile.details.resumeUrl;
+                                              if (url.startsWith('http') || url.startsWith('data:')) {
+                                                window.open(url, '_blank');
+                                              } else if (url.startsWith('Qm') || url.startsWith('ba')) {
+                                                window.open(`https://ipfs.io/ipfs/${url}`, '_blank');
+                                              }
+                                            }}
+                                            className="text-indigo-400 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all"
+                                          >
+                                            VIEW
+                                          </button>
+                                        )}
+                                      </div>
+                                   </div>
                                    
                                    <button 
                                      onClick={() => resumeInputRef.current.click()}
-                                     className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap"
+                                     className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20"
                                    >
-                                     {profile.details.resumeUrl ? 'Update' : 'Upload'}
+                                     {profile.details.resumeUrl ? 'RE-UPLOAD' : 'UPLOAD'}
                                    </button>
-                                </div>
+                                   <input type="file" ref={resumeInputRef} className="hidden" accept=".pdf,.doc,.docx" onChange={(e) => handleFileUpload(e, 'resume')} />
+                                 </div>
                                 <p className="text-[9px] text-slate-500 mt-2 italic px-1">Supports PDF, Word, or IPFS CID. Linked to your Soulbound Portrait.</p>
                              </div>
                           </div>
