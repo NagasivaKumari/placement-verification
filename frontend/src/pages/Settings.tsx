@@ -181,9 +181,6 @@ const Settings = ({ token, account, userRole }) => {
                              </div>
                              <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Resume / Talent Profile</label>
-                                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-1 flex items-center gap-2">
-                                   <input 
-                                     type="text" readOnly placeholder="Upload PDF/Doc or IPFS link..." 
                                  <div className="flex flex-col md:flex-row items-center gap-4">
                                    <div className="relative flex-1">
                                       <input 

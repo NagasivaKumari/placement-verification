@@ -452,44 +452,46 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
         "trustScore": trust_score
     }
 
-@app.put("/api/user/profile")
+@app.post("/api/user/profile")
 async def update_user_profile(req: UserProfileUpdateRequest, user: dict = Depends(get_current_user)):
-    wallet = user["wallet"]
-    
-    # SECURITY LOOPHOLE FIX: Prevent users from self-verifying or inflating trust scores
-    sensitive_fields = ["trustScore", "collegeVerified", "degreeVerified", "identityTx"]
-    sanitized_details = req.details.copy() if req.details else {}
-    
-    # DYNAMIC IDENTITY (Flexible Storage)
-    # General Resume and Avatar are stored directly in DB to allow frequent updates
-    # Only Placement Documents (Offer/Salary) require immutable IPFS pinning
-    for field in ["avatar", "resumeUrl"]:
-        val = sanitized_details.get(field)
-        if val: sanitized_details[field] = val # Store exactly as sent (Base64 or Link)
+    try:
+        wallet = user["wallet"]
+        
+        # SECURITY LOOPHOLE FIX: Prevent users from self-verifying or inflating trust scores
+        sensitive_fields = ["trustScore", "collegeVerified", "degreeVerified", "identityTx"]
+        sanitized_details = req.details.copy() if req.details else {}
+        
+        # DYNAMIC IDENTITY (Flexible Storage)
+        for field in ["avatar", "resumeUrl", "resumeName"]:
+            val = sanitized_details.get(field)
+            if val: sanitized_details[field] = val 
 
-    # We fetch the existing user to preserve their real verification status
-    existing_user = await db["users"].find_one({"walletAddress": wallet})
-    if existing_user and "details" in existing_user:
-        for field in sensitive_fields:
-            if field in existing_user["details"]:
-                sanitized_details[field] = existing_user["details"][field]
-            else:
-                sanitized_details.pop(field, None)
+        # We fetch the existing user to preserve their real verification status
+        existing_user = await db["users"].find_one({"walletAddress": wallet})
+        if existing_user and "details" in existing_user:
+            for field in sensitive_fields:
+                if field in existing_user["details"]:
+                    sanitized_details[field] = existing_user["details"][field]
+                else:
+                    sanitized_details.pop(field, None)
 
-    await db["users"].update_one(
-        {"walletAddress": wallet},
-        {"$set": {
-            "name": req.name,
-            "email": req.email,
-            "details": sanitized_details,
-            "updatedAt": datetime.utcnow()
-        }}
-    )
-    return {
-        "success": True, 
-        "message": "Profile anchored to IPFS and saved.",
-        "assetsPinned": True if "Qm" in str(sanitized_details) else False
-    }
+        await db["users"].update_one(
+            {"walletAddress": wallet},
+            {"$set": {
+                "name": req.name,
+                "email": req.email,
+                "details": sanitized_details,
+                "updatedAt": datetime.utcnow()
+            }}
+        )
+        return {
+            "success": True, 
+            "message": "Profile anchored successfully.",
+            "assetsPinned": True if "Qm" in str(sanitized_details) else False
+        }
+    except Exception as e:
+        print(f"[ERROR] Profile update failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/company/stats")
 async def get_company_stats(user: dict = Depends(get_current_user)):

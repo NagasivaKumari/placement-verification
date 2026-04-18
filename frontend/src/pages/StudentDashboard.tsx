@@ -62,6 +62,7 @@ const StudentDashboard = ({ token, account }) => {
 
   const handleUploadOffer = async (e) => {
     e.preventDefault();
+    if (!account) { setUploadMessage("Wallet connection lost. Please refresh."); return; }
     if (!offerCompany) { setUploadMessage("Select target employer."); return; }
     if (!selectedFile) { setUploadMessage("Please select your offer letter."); return; }
     setIsUploading(true);
@@ -81,8 +82,10 @@ const StudentDashboard = ({ token, account }) => {
         claimTxId = await signAndSendPlacementClaim(
           account, offerCompany, offerRole, offerSalary
         );
-      } catch (txnError) {
-        setUploadMessage("Transaction rejected. Claim not published.");
+      } catch (txnError: any) {
+        console.error("FULL STACK TRACE:", txnError.stack);
+        setUploadMessage(`Blockchain Error: ${txnError.message}\nCheck Console for Stack Trace.`);
+        window.alert(`CRITICAL ERROR DETECTED\nMessage: ${txnError.message}\nOrigin: ${txnError.stack?.split('\\n')[1] || "Unknown"}`);
         setIsUploading(false); return;
       }
 
