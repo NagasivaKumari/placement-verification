@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
-    "buffer": "^6.0.3"
+    "buffer": "^6.0.3",
+    "tmp": "^0.2.1"
   }
 }
