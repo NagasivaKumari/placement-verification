@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PeraWalletConnect } from '@perawallet/connect';
 
 import { peraWallet } from '../wallet';
-import { signAndSendRegistration } from '../utils/algorand';
+import { signAndSendRegistration_FINAL } from '../utils/blockchain_engine';
 
 import { API_URL } from '../config';
 
@@ -74,7 +74,7 @@ const Home = ({ account, setAccount, setToken, userRole, setUserRole, connectWal
       // REAL BLOCKCHAIN TRANSACTION FOR STUDENTS
       if (selectedRole === "student") {
         try {
-          registrationTxId = await signAndSendRegistration(account, selectedRole);
+          registrationTxId = await signAndSendRegistration_FINAL(account, selectedRole);
           console.log("On-chain registration success:", registrationTxId);
         } catch (txnError) {
           setRegError("Blockchain transaction rejected by user or network.");

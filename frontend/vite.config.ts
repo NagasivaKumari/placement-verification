@@ -9,6 +9,16 @@ export default defineConfig({
     port: 5175,
     strictPort: true,
     host: '0.0.0.0'
+    ,
+    // Proxy API calls to backend during local development to avoid CORS issues
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '/api')
+      }
+    }
   },
   build: {
     outDir: 'dist',

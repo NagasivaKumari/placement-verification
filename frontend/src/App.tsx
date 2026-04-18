@@ -31,7 +31,8 @@ function App() {
     if (savedToken) {
       setToken(savedToken);
     }
-    if (savedAccount) {
+    // Ignore literal strings 'null' or 'undefined' which can be stored by mistake
+    if (savedAccount && savedAccount !== 'null' && savedAccount !== 'undefined') {
       setAccount(savedAccount);
     }
     if (savedRole) {

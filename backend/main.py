@@ -31,10 +31,15 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    # Credentials (cookies) are not required for our Bearer token flow during local dev.
+    # When `allow_credentials=True` with `allow_origins=['*']` the CORS middleware
+    # will not set `Access-Control-Allow-Origin`. Set to False so wildcard origins work.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+print("CORS allowed origins:", ALLOWED_ORIGINS)
 
 # ============ Configuration ============
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://admin:password123@localhost:27017/placement-db?authSource=admin")
@@ -211,15 +216,16 @@ async def health_check():
 async def get_nonce(wallet: str):
     if not wallet:
         raise HTTPException(status_code=400, detail="Wallet required")
-    wallet = wallet.lower()
+    # Preserve original wallet casing for Algorand addresses (do not lowercase)
     nonce = f"Sign this message to prove you own the wallet: {str(time.time())}"
     nonces[wallet] = nonce
     return {"nonce": nonce}
 
 @app.post("/api/auth/verify-signature")
 async def verify_signature(req: VerifySignatureRequest):
-    wallet = req.wallet.lower()
-    user = await db["users"].find_one({"walletAddress": wallet})
+    # Case-insensitive search to ensure we find the user regardless of storage casing
+    wallet = req.wallet.strip()
+    user = await db["users"].find_one({"walletAddress": {"$regex": f"^{wallet}$", "$options": "i"}})
     role = user.get("role") if user else None
 
     token = jwt.encode(
@@ -235,6 +241,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import requests
 import base64 as b64
+import traceback
 
 # --- REAL IPFS ENGINE (PINATA) ---
 async def pinata_upload_ipfs(content, filename):
@@ -374,7 +381,7 @@ async def register_role(req: RegisterRoleRequest):
     
     del otp_db[req.email]
     
-    wallet = req.wallet.lower()
+    wallet = req.wallet.upper().strip()
 
     # 2. BLOCKCHAIN ANCHOR (IDENTITY MINTING)
     # To reach 80% Blockchain, we anchor the registration on-chain
@@ -434,7 +441,7 @@ async def register_role(req: RegisterRoleRequest):
 @app.get("/api/user/profile")
 async def get_user_profile(user: dict = Depends(get_current_user)):
     wallet = user["wallet"]
-    db_user = await db["users"].find_one({"walletAddress": wallet})
+    db_user = await db["users"].find_one({"walletAddress": {"$regex": f"^{wallet}$", "$options": "i"}})
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
     # Calculate Trust Score
@@ -452,7 +459,7 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
         "trustScore": trust_score
     }
 
-@app.post("/api/user/profile")
+@app.put("/api/user/profile")
 async def update_user_profile(req: UserProfileUpdateRequest, user: dict = Depends(get_current_user)):
     try:
         wallet = user["wallet"]
@@ -499,7 +506,7 @@ async def get_company_stats(user: dict = Depends(get_current_user)):
     total = await db["placements"].count_documents({"companyWallet": wallet})
     # Simple aggregation for average salary
     pipeline = [
-        {"$match": {"companyWallet": wallet}},
+        {"$match": {"companyWallet": {"$regex": f"^{wallet}$", "$options": "i"}}},
         {"$group": {"_id": None, "avgSalary": {"$avg": "$salary"}}}
     ]
     res = await db["placements"].aggregate(pipeline).to_list(length=1)
@@ -514,7 +521,7 @@ async def get_company_stats(user: dict = Depends(get_current_user)):
 @app.get("/api/company/placements")
 async def get_company_placements(page: int = 1, limit: int = 20, user: dict = Depends(get_current_user)):
     wallet = user["wallet"]
-    cursor = db["placements"].find({"companyWallet": wallet}).sort("createdAt", -1).skip((page - 1) * limit).limit(limit)
+    cursor = db["placements"].find({"companyWallet": {"$regex": f"^{wallet}$", "$options": "i"}}).sort("createdAt", -1).skip((page - 1) * limit).limit(limit)
     placements = await cursor.to_list(length=limit)
     total = await db["placements"].count_documents({"companyWallet": wallet})
     for p in placements: p["_id"] = str(p["_id"])
@@ -525,25 +532,45 @@ async def get_company_placements(page: int = 1, limit: int = 20, user: dict = De
         "pages": (total // limit) + (1 if total % limit > 0 else 0)
     }
 
+@app.get("/api/student/placements")
+async def get_student_placements(user: dict = Depends(get_current_user)):
+    wallet = user["wallet"]
+    cursor = db["placements"].find({"studentWallet": {"$regex": f"^{wallet}$", "$options": "i"}}).sort("createdAt", -1)
+    placements = await cursor.to_list(length=100)
+    for p in placements: p["_id"] = str(p["_id"])
+    return {"success": True, "placements": placements}
+
 # -- Placement Logic Routes --
 @app.post("/api/placements/student-upload")
 async def student_upload_offer(req: StudentUploadOfferRequest, user: dict = Depends(get_current_user)):
-    studentWallet = user["wallet"]
-    student = await db["users"].find_one({"walletAddress": studentWallet})
+    # Debug: log incoming auth and request headers (do NOT keep sensitive logs in production)
+    try:
+        import sys
+        print("[student-upload] decoded token wallet:", user.get("wallet"))
+        # Attempt normalized, case-insensitive lookup
+        studentWallet = user["wallet"].strip()
+        student = await db["users"].find_one({"walletAddress": {"$regex": f"^{studentWallet}$", "$options": "i"}})
+        print(f"[student-upload] lookup wallet: {studentWallet} -> found: {bool(student)}")
+    except Exception as e:
+        print('[student-upload] Error reading token or DB lookup:', e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Server error during authentication lookup")
     if not student: raise HTTPException(status_code=404, detail="Student profile not found")
 
     if not student.get("details", {}).get("collegeVerified"):
         raise HTTPException(status_code=403, detail="Institutional verification required before submitting claims.")
 
-    # REAL IPFS ANCHORING FOR OFFER LETTER
-    doc_cid = req.documentHash
-    if req.documentHash and req.documentHash.startswith("data:"):
-        doc_cid = await pinata_upload_ipfs(req.documentHash, f"offer_{req.verificationCode}.pdf")
-
+    # Generate verification code early so we can name IPFS uploads deterministically
     import hashlib
     vCode = hashlib.sha256(f"{time.time()}{student.get('email')}".encode()).hexdigest()[:18]
 
-    await db["placements"].insert_one({
+    # REAL IPFS ANCHORING FOR OFFER LETTER
+    doc_cid = req.documentHash
+    if req.documentHash and req.documentHash.startswith("data:"):
+        doc_cid = await pinata_upload_ipfs(req.documentHash, f"offer_{vCode}.pdf")
+
+    try:
+        await db["placements"].insert_one({
         "studentName": student.get("name"),
         "studentEmail": student.get("email"),
         "studentWallet": studentWallet,
@@ -552,14 +579,19 @@ async def student_upload_offer(req: StudentUploadOfferRequest, user: dict = Depe
         "placementType": req.placementType or "full-time",
         "senderEmail": req.senderEmail,
         "college": student.get("details", {}).get("college", "Unknown College"),
-        "companyWallet": req.companyWallet.lower(),
+        "companyWallet": req.companyWallet,
         "documentHash": doc_cid or req.documentHash,
         "verificationCode": vCode,
         "txHash": req.txHash,
         "status": "pending_company_approval",
         "appliedAt": datetime.utcnow(),
         "createdAt": datetime.utcnow()
-    })
+        })
+    except Exception as e:
+        print('[student-upload] Failed to insert placement:', e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to save placement")
+
     return {"success": True, "message": "Offer anchored to IPFS! Waiting for HR.", "verificationCode": vCode}
 
 @app.post("/api/placements/upload-joining")
@@ -890,7 +922,7 @@ async def get_college_students(user: dict = Depends(get_current_user)):
 @app.post("/api/college/verify-student")
 async def verify_college_student(req: VerifyStudentRequest, user: dict = Depends(get_current_user)):
     await db["users"].update_one(
-        {"walletAddress": req.studentWallet.lower()},
+        {"walletAddress": req.studentWallet},
         {"$set": {"details.collegeVerified": True, "details.verifiedAt": datetime.utcnow()}}
     )
     return {"success": True, "message": "Student successfully verified."}
@@ -903,7 +935,7 @@ async def verify_degree(req: VerifyDegreeRequest, user: dict = Depends(get_curre
     if not college or college.get("role") != "college":
         raise HTTPException(status_code=403, detail="Only colleges can verify degrees")
 
-    student = await db["users"].find_one({"walletAddress": req.studentWallet.lower()})
+    student = await db["users"].find_one({"walletAddress": req.studentWallet})
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -942,7 +974,7 @@ async def verify_degree(req: VerifyDegreeRequest, user: dict = Depends(get_curre
         print(f"[WARN] Degree SBT issuance failed: {e}")
 
     await db["users"].update_one(
-        {"walletAddress": req.studentWallet.lower()},
+        {"walletAddress": req.studentWallet},
         {"$set": {
             "details.degreeVerified": True, 
             "details.degreeName": req.degreeName,
@@ -1039,22 +1071,7 @@ async def search_college_placements(name: str):
     
     return {"success": True, "placements": result, "total": len(result), "college": name}
 
-# -- Student Routes --
-@app.get("/api/student/placements")
-async def get_student_placements(user: dict = Depends(get_current_user)):
-    student = await db["users"].find_one({"walletAddress": user["wallet"]})
-    if not student: raise HTTPException(status_code=404, detail="User not found")
 
-    cursor = db["placements"].find({"studentEmail": student.get("email")}).sort("createdAt", -1)
-    placements = await cursor.to_list(length=50)
-    
-    for p in placements:
-        c = await db["users"].find_one({"walletAddress": p.get("companyWallet")})
-        p["_id"] = str(p["_id"])
-        p["companyName"] = c.get("name") if c else "Unknown Company"
-        p["placementId"] = p.get("verificationCode")
-        
-    return {"success": True, "placements": placements}
 
 @app.post("/api/verify/student")
 async def verify_public_student(req: VerifyPublicStudentRequest):
@@ -1132,13 +1149,7 @@ async def discover_talent(
         
     return {"success": True, "talents": talents}
 
-@app.put("/api/user/profile/resume")
-async def update_resume(req: dict, user: dict = Depends(get_current_user)):
-    await db["users"].update_one(
-        {"walletAddress": user["wallet"]},
-        {"$set": {"details.resumeUrl": req.get("resumeUrl"), "details.portfolioUrl": req.get("portfolioUrl")}}
-    )
-    return {"success": True, "message": "Resume updated."}
+
 
 if __name__ == "__main__":
     import uvicorn

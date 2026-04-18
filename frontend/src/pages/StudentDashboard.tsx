@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../config';
 
-import { signAndSendPlacementClaim } from '../utils/algorand';
+import * as algosdk from 'algosdk';
+import { signAndSendPlacementClaim_FINAL } from '../utils/blockchain_engine';
+import { tryRestorePeraSession } from '../wallet';
+import TxModal from '../components/TxModal';
 
 const StudentDashboard = ({ token, account }) => {
   const [placements, setPlacements] = useState([]);
@@ -16,7 +19,10 @@ const StudentDashboard = ({ token, account }) => {
   const [placementType, setPlacementType] = useState("full-time");
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+   const [isUploading, setIsUploading] = useState(false);
+    const [walletConnected, setWalletConnected] = useState(false);
+   const [txModalVisible, setTxModalVisible] = useState(false);
+   const [txModalData, setTxModalData] = useState<{txId?: string | null; message?: string}>({ txId: null, message: '' });
 
   // Verification State
   const [salaryAmount, setSalaryAmount] = useState("");
@@ -26,6 +32,15 @@ const StudentDashboard = ({ token, account }) => {
     fetchPlacements();
     fetchCompanies();
     fetchProfile();
+      // Attempt to restore a Pera session silently on mount — do not prompt/connect.
+      (async () => {
+         try {
+            const accounts = await tryRestorePeraSession();
+            setWalletConnected(Array.isArray(accounts) && accounts.length > 0);
+         } catch (e) {
+            setWalletConnected(false);
+         }
+      })();
   }, [token]);
 
   const fetchProfile = async () => {
@@ -62,7 +77,9 @@ const StudentDashboard = ({ token, account }) => {
 
   const handleUploadOffer = async (e) => {
     e.preventDefault();
-    if (!account) { setUploadMessage("Wallet connection lost. Please refresh."); return; }
+      // Require an active Pera session (do not auto-open connect here)
+      if (!walletConnected) { setUploadMessage("No active wallet session. Please press Connect Wallet first."); window.alert('Please connect your Pera Wallet before publishing to ledger.'); return; }
+      if (!account) { setUploadMessage("Wallet connection lost. Please refresh."); return; }
     if (!offerCompany) { setUploadMessage("Select target employer."); return; }
     if (!selectedFile) { setUploadMessage("Please select your offer letter."); return; }
     setIsUploading(true);
@@ -77,38 +94,128 @@ const StudentDashboard = ({ token, account }) => {
       });
 
       // 1. REAL BLOCKCHAIN TRANSACTION (ANCHOR THE CLAIM)
+      // ==========================================
+      // CALL SITE AUDIT (BRUTAL TRUTH)
+      // ==========================================
+         console.log("CALL SITE SENDER:", account, typeof account);
+         console.log("CALL SITE COMPANY:", offerCompany, typeof offerCompany);
+
+         if (!account || account === "null" || account === "undefined") {
+            window.alert("CALL SITE ERROR: ACCOUNT IS UNDEFINED AT RUNTIME");
+            throw new Error("Call Site Breach: Sender is undefined before function call.");
+         }
+
+         // Normalize and canonicalize addresses. Accept common raw formats (hex/base64)
+         const hexToBytes = (hex: string) => {
+            const bytes: number[] = [];
+            for (let i = 0; i < hex.length; i += 2) {
+               bytes.push(parseInt(hex.substr(i, 2), 16));
+            }
+            return new Uint8Array(bytes);
+         };
+
+         const normalizeAndCanonicalize = (value: any) => {
+            if (!value && value !== '') return null;
+            // unwrap arrays or objects
+            if (Array.isArray(value) && value.length > 0) value = value[0];
+            if (typeof value === 'object' && value !== null) {
+               if (value.address) value = value.address;
+               else value = String(value);
+            }
+            let v = String(value).trim();
+
+            // Strip common CAIP / namespace prefixes (e.g. algorand:ADDR, did:algorand:ADDR)
+            if (v.includes(':')) {
+               const parts = v.split(':');
+               v = parts[parts.length - 1];
+            }
+            if (algosdk.isValidAddress(v)) return v;
+
+            // Hex (64 chars) -> public key
+            const hex64 = /^[0-9a-fA-F]{64}$/;
+            if (hex64.test(v)) {
+               try {
+                  const pk = hexToBytes(v);
+                  return algosdk.encodeAddress(pk);
+               } catch (e) {}
+            }
+
+            // base64 -> raw 32 bytes
+            try {
+               const decoded = Uint8Array.from(atob(v), (c) => c.charCodeAt(0));
+               if (decoded.length === 32) return algosdk.encodeAddress(decoded);
+            } catch (e) {}
+
+            return null;
+         };
+
+         const senderAddr = normalizeAndCanonicalize(account);
+         if (!senderAddr) {
+            setUploadMessage("Invalid wallet address: your connected account is not a valid Algorand address or public key.");
+            window.alert(`Invalid wallet address: ${String(account)}`);
+            setIsUploading(false);
+            return;
+         }
+
+         const companyAddr = normalizeAndCanonicalize(offerCompany);
+         if (!companyAddr) {
+            setUploadMessage("Invalid company address: please select a valid Algorand wallet or provide a valid public key.");
+            window.alert(`Invalid company address: ${String(offerCompany)}`);
+            setIsUploading(false);
+            return;
+         }
+
       let claimTxId = null;
       try {
-        claimTxId = await signAndSendPlacementClaim(
-          account, offerCompany, offerRole, offerSalary
-        );
-      } catch (txnError: any) {
-        console.error("FULL STACK TRACE:", txnError.stack);
-        setUploadMessage(`Blockchain Error: ${txnError.message}\nCheck Console for Stack Trace.`);
-        window.alert(`CRITICAL ERROR DETECTED\nMessage: ${txnError.message}\nOrigin: ${txnError.stack?.split('\\n')[1] || "Unknown"}`);
-        setIsUploading(false); return;
-      }
+            claimTxId = await signAndSendPlacementClaim_FINAL(
+               senderAddr, companyAddr, offerRole, offerSalary
+            );
+         } catch (txnError: any) {
+            console.error("FULL STACK TRACE:", txnError.stack);
+            setUploadMessage(`Blockchain Error: ${txnError.message}\nCheck Console for Stack Trace.`);
+            setTxModalData({ txId: claimTxId, message: `Blockchain Error: ${txnError.message}` });
+            setTxModalVisible(true);
+            setIsUploading(false); return;
+         }
 
       // 2. SEND METADATA TO BACKEND
-      const res = await fetch(`${API_URL}/api/placements/student-upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          companyWallet: offerCompany,
-          role: offerRole,
-          salary: parseFloat(offerSalary) || 0,
-          placementType: placementType,
-          senderEmail: offerSenderEmail,
-          documentHash: fileData, // Real file data for IPFS
-          txHash: claimTxId 
-        })
-      });
-      
-      if (res.ok) {
-        setUploadMessage("Success! Offer anchored with CID and TxID.");
-        setOfferRole(""); setOfferSalary(""); setSelectedFile(null);
-        fetchPlacements();
-      }
+         try {
+            const res = await fetch(`${API_URL}/api/placements/student-upload`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+               body: JSON.stringify({
+                  companyWallet: offerCompany,
+                  role: offerRole,
+                  salary: parseFloat(offerSalary) || 0,
+                  placementType: placementType,
+                  senderEmail: offerSenderEmail,
+                  documentHash: fileData, // Real file data for IPFS
+                  txHash: claimTxId 
+               })
+            });
+
+            if (res.ok) {
+               setUploadMessage("Success! Offer anchored with CID and TxID.");
+               setOfferRole(""); setOfferSalary(""); setSelectedFile(null);
+               fetchPlacements();
+            } else {
+               // Backend endpoint returned non-OK (404/500). Don't treat this as a failure
+               // of the on-chain anchoring. Inform the user that the txn was sent to the
+               // wallet and provide the TXID so they can verify on-chain later.
+               console.warn('Backend upload returned non-OK:', res.status, await res.text().catch(() => ''));
+               const message = `Transaction sent to wallet. Backend returned ${res.status}.`;
+               setUploadMessage(message);
+               setTxModalData({ txId: claimTxId, message });
+               setTxModalVisible(true);
+            }
+         } catch (err) {
+            // Network or CORS error — again, treat the on-chain result as the source of truth.
+            console.warn('Backend upload failed:', err);
+            const message = `Transaction sent to wallet. Could not reach backend.`;
+            setUploadMessage(message);
+            setTxModalData({ txId: claimTxId, message });
+            setTxModalVisible(true);
+            }
     } catch (err) { 
       setUploadMessage("Network failure during anchoring."); 
     } finally { setIsUploading(false); }
@@ -290,9 +397,12 @@ const StudentDashboard = ({ token, account }) => {
                      <input type="file" id="offerFile" className="hidden" onChange={e => setSelectedFile(e.target.files[0])} />
                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{selectedFile ? selectedFile.name : 'Click to Upload Offer Letter'}</p>
                   </div>
-                  <button type="submit" disabled={isUploading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-[0.98] transition-all">
+                  <button type="submit" disabled={isUploading || !walletConnected} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-[0.98] transition-all disabled:opacity-50">
                      {isUploading ? 'ANCHORING...' : 'PUBLISH TO LEDGER'}
                   </button>
+                  {!walletConnected && (
+                    <p className="text-center text-[10px] font-black text-rose-400 uppercase tracking-widest mt-2">Wallet not connected — press Connect Wallet in the header first.</p>
+                  )}
                   {uploadMessage && <p className="text-center text-[10px] font-black text-emerald-400 uppercase tracking-widest">{uploadMessage}</p>}
                </form>
             </div>
@@ -379,9 +489,10 @@ const StudentDashboard = ({ token, account }) => {
             </div>
          </div>
 
+         </div>
+         <TxModal visible={txModalVisible} txId={txModalData.txId} message={txModalData.message} onClose={() => setTxModalVisible(false)} />
       </div>
-    </div>
-  );
+   );
 };
 
 export default StudentDashboard;
