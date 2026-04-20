@@ -261,6 +261,28 @@ const StudentDashboard = ({ token, account }) => {
     } catch (err) { console.error(err); }
   };
 
+   const handleFlagPayment = async (verificationCode) => {
+      try {
+         const res = await fetch(`${API_URL}/api/placements/flag-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ verificationCode, message: 'Payment not received' })
+         });
+         if (res.ok) fetchPlacements(); else alert('Failed to flag payment');
+      } catch (e) { console.error(e); alert('Network error'); }
+   };
+
+   const handleConfirmPayment = async (verificationCode) => {
+      try {
+         const res = await fetch(`${API_URL}/api/placements/confirm-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ verificationCode, message: 'Payment confirmed by student' })
+         });
+         if (res.ok) fetchPlacements(); else alert('Failed to confirm payment');
+      } catch (e) { console.error(e); alert('Network error'); }
+   };
+
   return (
     <div className="container-custom py-16 max-w-7xl">
       {/* Header Banner */}
@@ -477,6 +499,12 @@ const StudentDashboard = ({ token, account }) => {
                                      <div className="flex items-center justify-center gap-2 text-emerald-500 bg-emerald-500/5 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.3em] border border-emerald-500/10">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
                                         Anchored to Algorand
+                                     </div>
+                                  )}
+                                  {(p.status === 'salary_pending' || p.status === 'salary_verified') && (
+                                     <div className="mt-3 flex gap-2">
+                                        <button onClick={() => handleFlagPayment(p.verificationCode)} className="flex-1 py-2 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase">Flag Non-Payment</button>
+                                        <button onClick={() => handleConfirmPayment(p.verificationCode)} className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase">Confirm Payment</button>
                                      </div>
                                   )}
                                </div>

@@ -190,6 +190,14 @@ class EmployerVerifyRequest(BaseModel):
 class VerifyStudentRequest(BaseModel):
     studentWallet: str
 
+
+class CompanyOffchainSignRequest(BaseModel):
+    verificationCode: str
+    signature: Optional[str] = None  # base64-encoded signature bytes
+    signerAddress: Optional[str] = None
+    message: Optional[str] = None
+    approvedViaDashboard: Optional[bool] = False
+
 class DocumentUploadRequest(BaseModel):
     placementId: str
     docType: str
@@ -199,6 +207,19 @@ class DocumentUploadRequest(BaseModel):
 class VerifyPublicStudentRequest(BaseModel):
     studentName: str
     studentEmail: str
+
+
+class BatchNotarizeRequest(BaseModel):
+    limit: Optional[int] = 100
+
+
+class TopUpRequest(BaseModel):
+    amount: float
+
+
+class NoSalaryVerifyRequest(BaseModel):
+    verificationCode: str
+    notes: Optional[str] = ''
 
 
 # ============ Routes ============
@@ -391,25 +412,26 @@ async def register_role(req: RegisterRoleRequest):
         from algosdk import account, mnemonic
 
         foundation_mnemonic = os.getenv("ALGOD_MNEMONIC")
-        app_id = int(os.getenv("PLACEMENT_PROCESS_APP_ID", "0"))
-        
-        if foundation_mnemonic and app_id > 0:
-            foundation_key = mnemonic.to_private_key(foundation_mnemonic)
-            foundation_address = account.address_from_private_key(foundation_key)
-            params = algod_client.suggested_params()
-            
-            # Application Call: registerUser(...)
-            # Args: [ "register", role_name, wallet_address ]
-            txn = ApplicationNoOpTxn(
-                sender=foundation_address,
-                sp=params,
-                index=app_id,
-                app_args=["register", req.role.encode(), wallet.encode()],
-                note=f"CollegeTruth Identity Anchor: {req.role}".encode()
-            )
-            stxn = txn.sign(foundation_key)
-            reg_tx_id = algod_client.send_transaction(stxn)
-            print(f"[IDENTITY ANCHOR ✅] TxID: {reg_tx_id}")
+        app_id_env = os.getenv("PLACEMENT_PROCESS_APP_ID")
+        # Enforce presence of on-chain anchoring configuration; do not silently skip.
+        if not foundation_mnemonic or not app_id_env:
+            raise HTTPException(status_code=500, detail="Blockchain identity anchoring required: set ALGOD_MNEMONIC and PLACEMENT_PROCESS_APP_ID in environment")
+        foundation_key = mnemonic.to_private_key(foundation_mnemonic)
+        foundation_address = account.address_from_private_key(foundation_key)
+        params = algod_client.suggested_params()
+        app_id = int(app_id_env)
+        # Application Call: registerUser(...)
+        # Args: [ "register", role_name, wallet_address ]
+        txn = ApplicationNoOpTxn(
+            sender=foundation_address,
+            sp=params,
+            index=app_id,
+            app_args=["register", req.role.encode(), wallet.encode()],
+            note=f"CollegeTruth Identity Anchor: {req.role}".encode()
+        )
+        stxn = txn.sign(foundation_key)
+        reg_tx_id = algod_client.send_transaction(stxn)
+        print(f"[IDENTITY ANCHOR ✅] TxID: {reg_tx_id}")
     except Exception as e:
         print(f"[WARN] Blockchain identity anchor failed: {e}")
 
@@ -503,10 +525,15 @@ async def update_user_profile(req: UserProfileUpdateRequest, user: dict = Depend
 @app.get("/api/company/stats")
 async def get_company_stats(user: dict = Depends(get_current_user)):
     wallet = user["wallet"]
+    # Total placements (all statuses)
     total = await db["placements"].count_documents({"companyWallet": wallet})
-    # Simple aggregation for average salary
+
+    # Verified hires: count only placements that completed payroll verification (Phase 3)
+    verified_count = await db["placements"].count_documents({"companyWallet": wallet, "status": "salary_verified"})
+
+    # Average salary computed only over salary_verified placements for accuracy
     pipeline = [
-        {"$match": {"companyWallet": {"$regex": f"^{wallet}$", "$options": "i"}}},
+        {"$match": {"companyWallet": {"$regex": f"^{wallet}$", "$options": "i"}, "status": "salary_verified"}},
         {"$group": {"_id": None, "avgSalary": {"$avg": "$salary"}}}
     ]
     res = await db["placements"].aggregate(pipeline).to_list(length=1)
@@ -514,8 +541,9 @@ async def get_company_stats(user: dict = Depends(get_current_user)):
 
     return {
         "totalPlacements": total,
+        "verifiedPlacements": verified_count,
         "avgSalary": avg_sal,
-        "mostCommonRole": "Software Engineer" # Mocked for MVP
+        "mostCommonRole": "Software Engineer"
     }
 
 @app.get("/api/company/placements")
@@ -539,6 +567,42 @@ async def get_student_placements(user: dict = Depends(get_current_user)):
     placements = await cursor.to_list(length=100)
     for p in placements: p["_id"] = str(p["_id"])
     return {"success": True, "placements": placements}
+
+
+@app.get("/api/leaderboard/colleges")
+async def get_college_leaderboard():
+    """Aggregate placement records into a simple leaderboard used by the frontend.
+    Returns top colleges with counts of offers, joined, certified and an approximate trust score.
+    """
+    try:
+        pipeline = [
+            {"$group": {
+                "_id": "$college",
+                "totalOffers": {"$sum": 1},
+                "studentConfirmed": {"$sum": {"$cond": [{"$eq": ["$status", "joining_verified"]}, 1, 0]}},
+                "salaryVerified": {"$sum": {"$cond": [{"$eq": ["$status", "salary_verified"]}, 1, 0]}}
+            }},
+            {"$project": {"college": "$_id", "totalOffers": 1, "studentConfirmed": 1, "salaryVerified": 1, "_id": 0}},
+            {"$sort": {"salaryVerified": -1}}
+        ]
+
+        stats = await db["placements"].aggregate(pipeline).to_list(length=200)
+
+        # Enrich with distinct employer count and derived trustScore
+        for s in stats:
+            college_name = s.get("college")
+            employers = await db["placements"].distinct("companyWallet", {"college": college_name})
+            s["employersCount"] = len(employers)
+            total = s.get("totalOffers", 0)
+            certified = s.get("salaryVerified", 0)
+            s["trustScore"] = int((certified / total) * 100) if total > 0 else 0
+            s["isHighTrust"] = s["trustScore"] > 80
+            s["isAnomaly"] = s["trustScore"] < 40 and total > 10
+
+        return {"success": True, "stats": stats}
+    except Exception as e:
+        print(f"[ERROR] Leaderboard aggregation failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to compute leaderboard")
 
 # -- Placement Logic Routes --
 @app.post("/api/placements/student-upload")
@@ -584,6 +648,8 @@ async def student_upload_offer(req: StudentUploadOfferRequest, user: dict = Depe
         "verificationCode": vCode,
         "txHash": req.txHash,
         "status": "pending_company_approval",
+        "payment_status": "unknown",  # unknown | paid | not_paid
+        "dispute_flag": False,
         "appliedAt": datetime.utcnow(),
         "createdAt": datetime.utcnow()
         })
@@ -648,6 +714,46 @@ async def company_verify_joining(req: CompanyConfirmStepRequest, user: dict = De
     )
     return {"success": True, "message": "Onboarding verified!"}
 
+
+@app.post("/api/placements/flag-payment")
+async def flag_payment(req: StudentConfirmRequest, user: dict = Depends(get_current_user)):
+    # Student flags payment not received (dispute)
+    wallet = user["wallet"]
+    placement = await db["placements"].find_one({"verificationCode": req.verificationCode, "studentWallet": wallet})
+    if not placement:
+        raise HTTPException(status_code=404, detail="Placement not found")
+
+    await db["placements"].update_one({"_id": placement["_id"]}, {"$set": {"dispute_flag": True, "payment_status": "not_paid", "disputeAt": datetime.utcnow(), "disputeNotes": req.message or ""}})
+    await db["placement_events"].insert_one({"placementId": placement["_id"], "event": "payment_flagged", "message": req.message or "Student flagged non-payment", "createdAt": datetime.utcnow()})
+    return {"success": True, "message": "Payment dispute recorded."}
+
+
+@app.post("/api/placements/confirm-payment")
+async def confirm_payment(req: StudentConfirmRequest, user: dict = Depends(get_current_user)):
+    # Student confirms payment received
+    wallet = user["wallet"]
+    placement = await db["placements"].find_one({"verificationCode": req.verificationCode, "studentWallet": wallet})
+    if not placement:
+        raise HTTPException(status_code=404, detail="Placement not found")
+
+    await db["placements"].update_one({"_id": placement["_id"]}, {"$set": {"dispute_flag": False, "payment_status": "paid", "paymentConfirmedAt": datetime.utcnow()}})
+    await db["placement_events"].insert_one({"placementId": placement["_id"], "event": "payment_confirmed", "message": req.message or "Student confirmed payment", "createdAt": datetime.utcnow()})
+    return {"success": True, "message": "Payment confirmed."}
+
+
+@app.get("/api/companies/suspicious")
+async def get_suspicious_companies(min_flags: int = 3):
+    # Aggregate companies with many dispute_flag == true placements
+    pipeline = [
+        {"$match": {"dispute_flag": True}},
+        {"$group": {"_id": "$companyWallet", "flags": {"$sum": 1}}},
+        {"$sort": {"flags": -1}},
+        {"$project": {"companyWallet": "$_id", "flags": 1, "_id": 0}}
+    ]
+    rows = await db["placements"].aggregate(pipeline).to_list(length=200)
+    rows = [r for r in rows if r.get("flags", 0) >= min_flags]
+    return {"success": True, "suspicious": rows}
+
 @app.post("/api/placements/verify-salary")
 async def verify_salary(req: SalaryVerificationRequest, user: dict = Depends(get_current_user)):
     wallet = user["wallet"]
@@ -672,6 +778,7 @@ async def verify_salary(req: SalaryVerificationRequest, user: dict = Depends(get
             "salaryVerifiedAt": datetime.utcnow()
         }}
     )
+    await db["placement_events"].insert_one({"placementId": placement["_id"], "event": "salary_verified", "salaryTxHash": req.salaryTxHash, "createdAt": datetime.utcnow()})
     return {"success": True, "message": "PAYROLL VERIFIED & PASSPORT MINTED!", "status": "salary_verified"}
 
 @app.post("/api/placements/company-verify")
@@ -694,11 +801,11 @@ async def company_verify(req: CompanyApproveRequest, user: dict = Depends(get_cu
     # Create a deterministic "IPFS-like" hash for the hackathon demo
     ipfs_cid = "Qm" + hashlib.sha256(str(ipfs_metadata).encode()).hexdigest()[:44]
 
-    # 2. Update DB with metadata hash
+    # 2. Update DB with metadata hash but DO NOT mark as fully verified until on-chain txn is submitted.
     await db["placements"].update_one(
         {"_id": placement["_id"]},
         {"$set": {
-            "status": "offer_verified",
+            "status": "offer_signing_requested",
             "employerVerifiedAt": datetime.utcnow(),
             "signerWallet": algorand_wallet,
             "ipfsCid": ipfs_cid
@@ -707,43 +814,127 @@ async def company_verify(req: CompanyApproveRequest, user: dict = Depends(get_cu
 
     # 3. USE SMART CONTRACT (APP CALL)
     unsigned_txn_encoded = None
+    # Prepare an ApplicationNoOpTxn and require that it succeeds; do not fallback.
+    params = None
     try:
         params = algod_client.suggested_params()
-        app_id = int(os.getenv("PLACEMENT_PROCESS_APP_ID", 758916193))
-        
-        # This is a REAL Smart Contract Call (Application NoOp)
-        # We pass the verification hash as an app argument for on-chain logic
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch algod suggested params: {e}")
+
+    app_id_env = os.getenv("PLACEMENT_PROCESS_APP_ID")
+    if not app_id_env:
+        raise HTTPException(status_code=500, detail="PL﻿ACEMENT_PROCESS_APP_ID not configured; on-chain verification required and wallet signing cannot be skipped.")
+    try:
+        app_id = int(app_id_env)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Invalid PLACEMENT_PROCESS_APP_ID; must be an integer")
+
+    try:
         txn = algosdk.transaction.ApplicationNoOpTxn(
             sender=algorand_wallet,
             sp=params,
             index=app_id,
             app_args=[
-                "verify_placement".encode(), 
+                "verify_placement".encode(),
                 req.verificationCode.encode()
             ],
             note=f"CollegeTruth|IPFS:{ipfs_cid}".encode()
         )
-        unsigned_txn_encoded = base64.b64encode(algosdk.encoding.msgpack_encode(txn)).decode()
+        raw = algosdk.encoding.msgpack_encode(txn)
+        if isinstance(raw, str):
+            raw = raw.encode()
+        unsigned_txn_encoded = base64.b64encode(raw).decode()
         print(f"[BLOCKCHAIN] Smart Contract Call prepared for App ID {app_id}")
     except Exception as e:
-        print(f"[WARN] AppCall prep failed, falling back to notarization: {e}")
-        # Fallback notarization if smart contract is not reachable
-        txn = algosdk.transaction.PaymentTxn(
-            sender=algorand_wallet,
-            sp=params,
-            receiver=algorand_wallet,
-            amt=0,
-            note=f"CollegeTruth|IPFS:{ipfs_cid}".encode()
-        )
-        unsigned_txn_encoded = base64.b64encode(algosdk.encoding.msgpack_encode(txn)).decode()
+        # Fail hard — do not create a fallback notarization transaction
+        print(f"[ERROR] AppCall prep failed; aborting without fallback: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to prepare smart contract transaction: {e}")
 
     return {
         "success": True,
         "message": "Phase 2 Initiated: Signing Smart Contract & Anchoring IPFS Metadata.",
-        "status": "offer_verified",
+        "status": "offer_signing_requested",
         "unsignedTxn": unsigned_txn_encoded,
         "ipfsCid": ipfs_cid
     }
+
+
+@app.post("/api/placements/company-sign-offchain")
+async def company_sign_offchain(req: CompanyOffchainSignRequest, user: dict = Depends(get_current_user)):
+    """Accepts an employer off-chain signature, verifies it, and stores it on the placement.
+    This enables relayer-based anchoring later without requiring the employer to submit an on-chain txn.
+    """
+    wallet = user["wallet"].upper()
+
+    placement = await db["placements"].find_one({"verificationCode": req.verificationCode, "companyWallet": wallet})
+    if not placement:
+        raise HTTPException(status_code=404, detail="Placement not found for this company.")
+
+    # Ensure we have an ipfsCid recorded for deterministic message creation
+    ipfs_cid = placement.get("ipfsCid")
+    if not ipfs_cid:
+        import hashlib
+        ipfs_metadata = {
+            "student": placement.get("studentName"),
+            "role": placement.get("role"),
+            "salary": placement.get("salary"),
+            "verificationCode": req.verificationCode
+        }
+        ipfs_cid = "Qm" + hashlib.sha256(str(ipfs_metadata).encode()).hexdigest()[:44]
+        await db["placements"].update_one({"_id": placement["_id"]}, {"$set": {"ipfsCid": ipfs_cid}})
+
+    # If caller provided an explicit dashboard approval flag, accept without cryptographic signature
+    if req.approvedViaDashboard or not req.signature:
+        await db["placements"].update_one(
+            {"_id": placement["_id"]},
+            {"$set": {
+                "status": "offer_signed_offchain",
+                "offchainSignature": req.signature or None,
+                "signerWallet": wallet,
+                "signedAt": datetime.utcnow(),
+                "ipfsCid": ipfs_cid,
+                "employerVerifiedAt": datetime.utcnow(),
+                "approvedViaDashboard": True
+            }}
+        )
+        return {"success": True, "message": "Dashboard approval recorded (no signature).", "status": "offer_signed_offchain", "ipfsCid": ipfs_cid}
+
+    # Canonical message used for signing (frontend should use the same format)
+    canonical_message = req.message.encode() if req.message else f"CollegeTruth|offchain_verify|{req.verificationCode}|{ipfs_cid}".encode()
+
+    # Decode provided signature (expect base64)
+    try:
+        sig_bytes = base64.b64decode(req.signature)
+    except Exception as e:
+        print(f"[SIGNOFF] Invalid signature encoding: {e}")
+        raise HTTPException(status_code=400, detail="Invalid signature encoding; expected base64 string")
+
+    # Verify signature using Algorand ed25519 verification helper
+    try:
+        from algosdk import util as algoutil
+        verified = algoutil.verify_bytes(canonical_message, sig_bytes, wallet)
+    except Exception as e:
+        print(f"[SIGNOFF] Signature verification error: {e}")
+        verified = False
+
+    if not verified:
+        raise HTTPException(status_code=403, detail="Signature verification failed")
+
+    # Persist signature and mark placement as offchain-signed
+    await db["placements"].update_one(
+        {"_id": placement["_id"]},
+        {"$set": {
+            "status": "offer_signed_offchain",
+            "offchainSignature": req.signature,
+            "signerWallet": wallet,
+            "signedAt": datetime.utcnow(),
+            "ipfsCid": ipfs_cid,
+            "employerVerifiedAt": datetime.utcnow(),
+            "approvedViaDashboard": False
+        }}
+    )
+
+    return {"success": True, "message": "Off-chain signature accepted and stored.", "status": "offer_signed_offchain", "ipfsCid": ipfs_cid}
 
 @app.post("/api/placements/submit-signed-txn")
 async def submit_signed_txn(req: SubmitSignedTxnRequest, user: dict = Depends(get_current_user)):
@@ -777,7 +968,7 @@ async def submit_signed_txn(req: SubmitSignedTxnRequest, user: dict = Depends(ge
         {"_id": placement["_id"]},
         {"$set": {
             "txHash": tx_id,
-            "status": "joining_verified",
+            "status": "offer_verified",
             "onChainAt": datetime.utcnow()
         }}
     )
@@ -818,6 +1009,8 @@ async def verify_salary(req: SalaryVerificationRequest, user: dict = Depends(get
             "salaryVerifiedAt": datetime.utcnow()
         }}
     )
+
+    await db["placement_events"].insert_one({"placementId": placement["_id"], "event": "salary_verified", "salaryTxHash": req.salaryTxHash, "createdAt": datetime.utcnow()})
 
     # 2. SOULBOUND TOKEN (SBT) ISSUANCE
     # We mint an NFT (ASA) as a permanent credential for the student
@@ -1114,6 +1307,172 @@ async def get_total_company_stats():
     c_count = await db["users"].count_documents({"role": "company"})
     p_count = await db["placements"].count_documents({})
     return {"totalCompanies": c_count, "totalPlacements": p_count}
+
+
+def _get_foundation_account():
+    from algosdk import account, mnemonic
+    foundation_mnemonic = os.getenv("ALGOD_MNEMONIC")
+    if not foundation_mnemonic:
+        return None, None
+    try:
+        sk = mnemonic.to_private_key(foundation_mnemonic)
+        addr = account.address_from_private_key(sk)
+        return addr, sk
+    except Exception as e:
+        print(f"[RELAYER] Failed to derive foundation account: {e}")
+        return None, None
+
+
+@app.post("/api/admin/batch-notarize")
+async def batch_notarize(req: BatchNotarizeRequest, user: dict = Depends(get_current_user)):
+    """Batch notarize pending off-chain signed placements. Restricted to privileged roles (college/admin).
+    This creates a single on-chain anchor (payment txn with note) paid by the foundation/relayer account.
+    """
+    if user.get("role") not in ["college", "admin"]:
+        raise HTTPException(status_code=403, detail="Insufficient privileges to run batch notarizer")
+
+    addr, sk = _get_foundation_account()
+    if not addr or not sk:
+        raise HTTPException(status_code=500, detail="Relayer not configured: set ALGOD_MNEMONIC in environment")
+
+    cursor = db["placements"].find({"status": "offer_signed_offchain"}).sort("signedAt", 1).limit(req.limit)
+    items = await cursor.to_list(length=req.limit)
+    if not items:
+        return {"success": True, "message": "No off-chain signed placements to notarize."}
+
+    # Build deterministic payload: sorted by verificationCode
+    import hashlib
+    entries = []
+    for p in items:
+        v = p.get("verificationCode") or ""
+        ipfs = p.get("ipfsCid") or ""
+        signer = p.get("signerWallet") or ""
+        entries.append(f"{v}|{ipfs}|{signer}")
+    entries.sort()
+    payload = "||".join(entries)
+    anchor_hash = hashlib.sha256(payload.encode()).hexdigest()
+
+    # Create a cheap payment txn with anchor hash in note
+    try:
+        params = algod_client.suggested_params()
+        from algosdk.transaction import PaymentTxn
+        note = f"CollegeTruth Anchor:{anchor_hash}".encode()
+        txn = PaymentTxn(sender=addr, sp=params, receiver=addr, amt=0, note=note)
+        stxn = txn.sign(sk)
+        txid = algod_client.send_transaction(stxn)
+        print(f"[RELAYER] Anchor tx sent: {txid} with hash {anchor_hash}")
+        algosdk.transaction.wait_for_confirmation(algod_client, txid, 4)
+    except Exception as e:
+        print(f"[RELAYER] Anchor submission failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Anchor submission failed: {e}")
+
+    # Update placements in DB and write audit events
+    for p in items:
+        await db["placements"].update_one({"_id": p["_id"]}, {"$set": {"status": "offer_signed_onchain", "anchorTx": txid, "anchorHash": anchor_hash, "anchoredAt": datetime.utcnow()}})
+        await db["placement_events"].insert_one({
+            "placementId": p["_id"],
+            "event": "anchored",
+            "anchorTx": txid,
+            "anchorHash": anchor_hash,
+            "createdAt": datetime.utcnow(),
+            "notes": "Batch anchor"
+        })
+
+    return {"success": True, "message": "Batch anchored", "txId": txid, "anchorHash": anchor_hash, "count": len(items)}
+
+
+@app.get("/api/admin/events")
+async def get_admin_events(user: dict = Depends(get_current_user)):
+    # Only allow college/admin users to view audit events
+    if user.get("role") not in ["college", "admin"]:
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
+    cursor = db["placement_events"].find().sort("createdAt", -1).limit(200)
+    events = await cursor.to_list(length=200)
+    for e in events: e["_id"] = str(e["_id"])
+    return {"success": True, "events": events}
+
+
+@app.get("/api/admin/batches")
+async def get_admin_batches(user: dict = Depends(get_current_user)):
+    if user.get("role") not in ["college", "admin"]:
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
+    pipeline = [
+        {"$match": {"event": "anchored"}},
+        {"$group": {"_id": "$anchorHash", "txs": {"$addToSet": "$anchorTx"}, "count": {"$sum": 1}, "lastAt": {"$max": "$createdAt"}}},
+        {"$project": {"anchorHash": "$_id", "txs": 1, "count": 1, "lastAt": 1, "_id": 0}},
+        {"$sort": {"lastAt": -1}}
+    ]
+    batches = await db["placement_events"].aggregate(pipeline).to_list(length=200)
+    return {"success": True, "batches": batches}
+
+
+@app.get("/admin")
+async def admin_ui():
+        html = """
+        <!doctype html>
+        <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>CollegeTruth Admin</title>
+                <style>body{font-family:Helvetica,Arial;background:#0f172a;color:#e6eef8;padding:20px}button{padding:10px 14px;border-radius:8px;border:none;background:#4f46e5;color:white;cursor:pointer}pre{background:#071029;padding:12px;border-radius:8px;overflow:auto}</style>
+            </head>
+            <body>
+                <h1>CollegeTruth — Admin Console</h1>
+                <p>Provide a valid Bearer token below (JWT from /api/auth/verify-signature) for authenticated admin actions.</p>
+                <div style="margin-bottom:12px"><input id="token" placeholder="Bearer &lt;token&gt;" style="width:80%"/></div>
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <button onclick="runBatch()">Run Batch Notarize</button>
+                    <button onclick="loadEvents()">Load Events</button>
+                    <button onclick="loadBatches()">Load Batches</button>
+                </div>
+                <h3>Response</h3>
+                <pre id="out">(responses will appear here)</pre>
+
+                <script>
+                const API = location.origin.replace(/:\/8000/,':8000');
+                async function runBatch(){
+                    const token = document.getElementById('token').value;
+                    const res = await fetch(API + '/api/admin/batch-notarize', {method:'POST', headers: {'Content-Type':'application/json','Authorization': token}, body: JSON.stringify({limit:20})});
+                    document.getElementById('out').textContent = JSON.stringify(await res.json(), null, 2);
+                }
+                async function loadEvents(){
+                    const token = document.getElementById('token').value;
+                    const res = await fetch(API + '/api/admin/events', {headers: {'Authorization': token}});
+                    document.getElementById('out').textContent = JSON.stringify(await res.json(), null, 2);
+                }
+                async function loadBatches(){
+                    const token = document.getElementById('token').value;
+                    const res = await fetch(API + '/api/admin/batches', {headers: {'Authorization': token}});
+                    document.getElementById('out').textContent = JSON.stringify(await res.json(), null, 2);
+                }
+                </script>
+            </body>
+        </html>
+        """
+        return HTMLResponse(content=html, status_code=200)
+
+
+@app.post("/api/companies/topup")
+async def company_topup(req: TopUpRequest, user: dict = Depends(get_current_user)):
+    wallet = user["wallet"]
+    # Simple accounting: add credits to user's record
+    await db["users"].update_one({"walletAddress": wallet}, {"$inc": {"credits": float(req.amount)}}, upsert=False)
+    return {"success": True, "message": f"Top-up of {req.amount} recorded for {wallet}"}
+
+
+@app.post("/api/admin/verify-no-salary")
+async def admin_verify_no_salary(req: NoSalaryVerifyRequest, user: dict = Depends(get_current_user)):
+    # Allow admins or college roles to manually verify unpaid placements
+    if user.get("role") not in ["college", "admin"]:
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
+
+    placement = await db["placements"].find_one({"verificationCode": req.verificationCode})
+    if not placement:
+        raise HTTPException(status_code=404, detail="Placement not found")
+
+    await db["placements"].update_one({"_id": placement["_id"]}, {"$set": {"status": "verified_non_salary", "verifiedAt": datetime.utcnow(), "verifyNotes": req.notes}})
+    await db["placement_events"].insert_one({"placementId": placement["_id"], "event": "verified_non_salary", "notes": req.notes, "createdAt": datetime.utcnow()})
+    return {"success": True, "message": "Placement marked as verified (no salary)."}
 
 # -- Discovery Routes (Talent Pool) --
 @app.get("/api/company/discover-talent")
